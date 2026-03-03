@@ -1,0 +1,214 @@
+---
+title: Introduction to Agora DAO
+description: Build and manage decentralized autonomous organizations on Ethereum with role-based governance and trustless task management
+---
+
+## What is Agora DAO?
+
+Agora DAO is a **decentralized autonomous organization** platform that enables community-driven governance, task management, and token-based incentives. Built on Ethereum (or compatible EVM chains) with a **Hardhat** smart-contract suite and a **Next.js** frontend, the platform lets you create DAOs, join them, and execute on-chain actions in a trustless manner.
+
+The platform combines the power of smart contracts with an intuitive user interface to make DAO creation and management accessible to everyone—from developers to community organizers.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Create your first DAO in under 5 minutes
+  </Card>
+  <Card
+    title="Installation"
+    icon="code"
+    href="/installation"
+  >
+    Set up the development environment locally
+  </Card>
+  <Card
+    title="Smart contracts"
+    icon="file-contract"
+    href="/contracts/overview"
+  >
+    Explore the Solidity contracts architecture
+  </Card>
+  <Card
+    title="Frontend components"
+    icon="brackets-curly"
+    href="/frontend/components"
+  >
+    Learn about available UI components and hooks
+  </Card>
+</CardGroup>
+
+## Key features
+
+Agora DAO provides a comprehensive toolkit for decentralized organization management:
+
+### Decentralized escrow for task payments
+
+Funds are locked in a smart contract until a task is completed and verified, ensuring fair compensation without a trusted third party. This eliminates the need for intermediaries and creates a transparent, trustless payment system.
+
+### Role-based access control (RBAC)
+
+Leveraging OpenZeppelin's `AccessControl`, the system defines multiple roles to restrict actions:
+
+- `DEFAULT_ADMIN_ROLE` - Full administrative control over the DAO
+- `USER_ROLE` - Standard members who can participate in DAO activities
+- `AUDITOR_ROLE` - Special role for auditing and verification
+- `TASK_MANAGER_ROLE` - Manages task creation and assignments
+- `PROPOSAL_MANAGER_ROLE` - Handles governance proposals
+
+```solidity AgoraDao/Rol.sol
+bytes32 internal constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+bytes32 internal constant TASK_MANAGER_ROLE = keccak256("TASK_MANAGER_ROLE");
+bytes32 internal constant PROPOSAL_MANAGER_ROLE = keccak256("PROPOSAL_MANAGER_ROLE");
+bytes32 internal constant USER_ROLE = keccak256("USER_ROLE");
+```
+
+### DAO creation and management
+
+Users can spin up new DAOs via the `AgoraDaoFactory` contract with just a few parameters:
+
+```solidity AgoraDaoFactory.sol
+function createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string memory _imageURI
+) external
+```
+
+Each DAO is deployed as an independent contract with its own:
+- Member registry
+- Role management
+- Governance structure
+- Treasury
+
+### Join and participate
+
+Members can join a DAO, earn reputation, and interact with on-chain governance mechanisms. The joining process is simple and managed entirely on-chain:
+
+```solidity AgoraDao.sol
+function joinDao() external {
+    require(!hasRole(USER_ROLE, msg.sender), "User already joined");
+    require(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "The owner can't join");
+
+    IAgoraDaoFactory(fabric).addUserCounter(msg.sender);
+    emit UserJoined(msg.sender, userCounter);
+
+    _joinDaoUser(msg.sender);
+    userCounter++;
+}
+```
+
+### Token and NFT rewards
+
+Integrated reward system for tokens and NFTs enables active contributors to earn incentives for their participation and contributions to the DAO.
+
+## Architecture
+
+Agora DAO uses a factory pattern architecture for efficient DAO deployment:
+
+<Steps>
+  <Step title="Factory contract">
+    The `AgoraDaoFactory` serves as the central registry and deployment contract. It maintains a list of all created DAOs and their metadata.
+  </Step>
+  <Step title="DAO instances">
+    Each DAO is deployed as an individual `AgoraDao` contract with its own state, members, and governance rules.
+  </Step>
+  <Step title="Frontend integration">
+    The Next.js application connects to contracts using wagmi and viem, providing a seamless user experience.
+  </Step>
+</Steps>
+
+<Note>
+  The factory pattern ensures each DAO is isolated while maintaining a connection to the parent factory for global statistics and user tracking.
+</Note>
+
+### Smart contract structure
+
+```
+packages/hardhat/contracts/
+├── AgoraDaoFactory.sol      # Main factory contract
+├── AgoraDao.sol              # Individual DAO contract
+├── AgoraDaoFactory/
+│   └── Validation.sol        # Input validation logic
+└── AgoraDao/
+    └── Rol.sol               # Role-based access control
+```
+
+## Use cases
+
+Agora DAO is designed for a wide range of decentralized organization needs:
+
+### Community governance
+
+Create transparent governance structures for online communities, allowing members to vote on proposals, allocate funds, and shape the direction of the organization.
+
+### Task-based collaboration
+
+Coordinate distributed teams with escrow-backed task assignments. Contributors are guaranteed payment upon completion, and the DAO maintains full transparency.
+
+### Grant programs
+
+Manage grant distributions with multi-signature approvals and role-based permissions. Track fund allocation and impact in real-time.
+
+### Social impact initiatives
+
+Launch DAOs focused on social good with categories including:
+- Service DAOs for community support
+- Governance DAOs for democratic decision-making
+- Social Impact DAOs for charitable initiatives
+- Energy DAOs for sustainability projects
+
+### Investment clubs
+
+Pool resources with like-minded individuals and make collective investment decisions through on-chain governance.
+
+## Technology stack
+
+<CardGroup cols={2}>
+  <Card title="Smart contracts" icon="ethereum">
+    - Solidity ^0.8.0
+    - Hardhat development environment
+    - OpenZeppelin contracts
+    - Ethers.js v6
+  </Card>
+  <Card title="Frontend" icon="react">
+    - Next.js 15 with App Router
+    - React 19
+    - TypeScript 5.8
+    - Tailwind CSS 4.1
+  </Card>
+  <Card title="Web3 integration" icon="wallet">
+    - wagmi v2
+    - viem v2
+    - RainbowKit wallet connection
+    - React Query for state management
+  </Card>
+  <Card title="Development tools" icon="wrench">
+    - Yarn 3 workspaces
+    - Node.js >=20.18.3
+    - ESLint and Prettier
+    - Hardhat testing framework
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Create your first DAO"
+    icon="play"
+    href="/quickstart"
+  >
+    Follow our quickstart guide to deploy and join a DAO
+  </Card>
+  <Card
+    title="Set up development environment"
+    icon="terminal"
+    href="/installation"
+  >
+    Install dependencies and run the project locally
+  </Card>
+</CardGroup>

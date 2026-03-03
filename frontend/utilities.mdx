@@ -1,0 +1,547 @@
+---
+title: 'Utilities'
+description: 'Helper functions and utilities for the Agora DAO frontend'
+icon: 'wrench'
+---
+
+Utility functions for common operations including contract interactions, formatting, error handling, and constants.
+
+## Contract Utilities
+
+Helper functions for smart contract interactions.
+
+### Contract Type System
+
+**Location:** `utils/scaffold-eth/contract.ts`
+
+Provides full TypeScript type safety for contract interactions.
+
+**Key Types:**
+
+```tsx
+import type {
+  ContractName,
+  ContractAbi,
+  AbiFunctionArguments,
+  AbiFunctionReturnType,
+} from "~~/utils/scaffold-eth/contract";
+
+// Get contract names (e.g., "AgoraDAO", "TokenContract")
+type MyContractName = ContractName;
+
+// Get contract ABI type
+type MyContractAbi = ContractAbi<"AgoraDAO">;
+
+// Get function argument types
+type CreateProposalArgs = AbiFunctionArguments<
+  ContractAbi<"AgoraDAO">,
+  "createProposal"
+>;
+
+// Get function return type
+type ProposalData = AbiFunctionReturnType<
+  ContractAbi<"AgoraDAO">,
+  "getProposal"
+>;
+```
+
+### getParsedError
+
+Parse and format contract errors for display.
+
+**Location:** `utils/scaffold-eth/getParsedError.ts`
+
+**Usage:**
+
+```tsx
+import { getParsedError } from "~~/utils/scaffold-eth";
+
+try {
+  await writeContractAsync({ functionName: "vote", args: [proposalId] });
+} catch (error) {
+  const errorMessage = getParsedError(error);
+  console.error(errorMessage);
+  // "Execution reverted: Proposal has ended"
+}
+```
+
+### getParsedErrorWithAllAbis
+
+Enhanced error parsing that checks all deployed contracts.
+
+**Location:** `utils/scaffold-eth/contract.ts:347`
+
+**Usage:**
+
+```tsx
+import { getParsedErrorWithAllAbis } from "~~/utils/scaffold-eth/contract";
+import { hardhat } from "viem/chains";
+
+try {
+  await writeContractAsync({ functionName: "complexOperation" });
+} catch (error) {
+  const errorMessage = getParsedErrorWithAllAbis(error, hardhat.id);
+  // Returns: "InvalidProposal(uint256) from AgoraDAO contract"
+  toast.error(errorMessage);
+}
+```
+
+**Features:**
+- Decodes error signatures from any contract in the system
+- Creates lookup table from all deployed contracts
+- Provides contract name and error signature
+- Helpful context for nested contract calls
+
+### simulateContractWriteAndNotifyError
+
+Simulate contract writes before execution.
+
+**Location:** `utils/scaffold-eth/contract.ts:406`
+
+**Usage:**
+
+```tsx
+import { simulateContractWriteAndNotifyError } from "~~/utils/scaffold-eth/contract";
+import { useConfig } from "wagmi";
+
+const wagmiConfig = useConfig();
+
+await simulateContractWriteAndNotifyError({
+  wagmiConfig,
+  writeContractParams: {
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: "vote",
+    args: [proposalId, true],
+  },
+  chainId: 31337,
+});
+```
+
+**Features:**
+- Pre-execution validation
+- Automatic error notifications
+- Prevents failed transactions
+- Gas estimation
+
+## Blockchain Explorers
+
+### getBlockExplorerAddressLink
+
+Generate block explorer URL for an address.
+
+**Location:** `utils/scaffold-eth/networks.ts`
+
+**Usage:**
+
+```tsx
+import { getBlockExplorerAddressLink } from "~~/utils/scaffold-eth";
+import { mainnet } from "viem/chains";
+
+const explorerLink = getBlockExplorerAddressLink(
+  mainnet,
+  "0x1234567890123456789012345678901234567890"
+);
+// "https://etherscan.io/address/0x1234567890123456789012345678901234567890"
+
+<a href={explorerLink} target="_blank" rel="noopener noreferrer">
+  View on Etherscan
+</a>
+```
+
+### getBlockExplorerTxLink
+
+Generate block explorer URL for a transaction.
+
+**Location:** `utils/scaffold-eth/networks.ts`
+
+**Usage:**
+
+```tsx
+import { getBlockExplorerTxLink } from "~~/utils/scaffold-eth";
+
+const txLink = getBlockExplorerTxLink(chainId, txHash);
+// "https://etherscan.io/tx/0xabc..."
+```
+
+## Data Formatting
+
+### replacer
+
+JSON.stringify replacer for BigInt serialization.
+
+**Location:** `utils/scaffold-eth/common.ts`
+
+**Usage:**
+
+```tsx
+import { replacer } from "~~/utils/scaffold-eth/common";
+
+const data = {
+  amount: BigInt("1000000000000000000"),
+  timestamp: BigInt(Date.now()),
+};
+
+const jsonString = JSON.stringify(data, replacer);
+// {"amount":"1000000000000000000","timestamp":"1234567890"}
+
+const parsed = JSON.parse(jsonString);
+// amounts are strings, need to convert back to BigInt
+```
+
+### formatEther / parseEther
+
+Format and parse Ether values (from viem).
+
+**Usage:**
+
+```tsx
+import { formatEther, parseEther } from "viem";
+
+// Convert wei to ETH string
+const balance = formatEther(BigInt("1000000000000000000"));
+// "1.0"
+
+// Convert ETH string to wei
+const weiAmount = parseEther("1.5");
+// 1500000000000000000n
+```
+
+### formatUnits / parseUnits
+
+Format and parse token amounts with custom decimals.
+
+**Usage:**
+
+```tsx
+import { formatUnits, parseUnits } from "viem";
+
+// USDC has 6 decimals
+const usdcBalance = formatUnits(BigInt("1000000"), 6);
+// "1.0"
+
+const usdcAmount = parseUnits("100.5", 6);
+// 100500000n
+```
+
+## Address Utilities
+
+### ZERO_ADDRESS
+
+Constant for zero address.
+
+**Location:** `utils/scaffold-eth/common.ts`
+
+**Usage:**
+
+```tsx
+import { ZERO_ADDRESS } from "~~/utils/scaffold-eth/common";
+
+if (owner === ZERO_ADDRESS) {
+  console.log("No owner set");
+}
+```
+
+**Value:** `"0x0000000000000000000000000000000000000000"`
+
+### isZeroAddress
+
+Check if address is zero address.
+
+**Location:** `utils/scaffold-eth/common.ts`
+
+**Usage:**
+
+```tsx
+import { isZeroAddress } from "~~/utils/scaffold-eth/common";
+
+if (isZeroAddress(tokenAddress)) {
+  return "No token address configured";
+}
+```
+
+### isAddress
+
+Validate Ethereum address format (from viem).
+
+**Usage:**
+
+```tsx
+import { isAddress } from "viem";
+
+if (!isAddress(userInput)) {
+  throw new Error("Invalid address format");
+}
+```
+
+### getAddress
+
+Get checksummed address (from viem).
+
+**Usage:**
+
+```tsx
+import { getAddress } from "viem";
+
+const checksummed = getAddress("0xd8da6bf26964af9d7eed9e03e53415d37aa96045");
+// "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+```
+
+## Constants
+
+### LOCAL_STORAGE_KEYS
+
+Constants for localStorage keys.
+
+**Location:** `constants/localStorage.ts`
+
+**Usage:**
+
+```tsx
+import { LOCAL_STORAGE_KEYS } from "~~/constants/localStorage";
+
+// Save DAO address
+localStorage.setItem(
+  LOCAL_STORAGE_KEYS.DAO_ADDRESS,
+  "0x1234567890123456789012345678901234567890"
+);
+
+// Retrieve DAO address
+const daoAddress = localStorage.getItem(LOCAL_STORAGE_KEYS.DAO_ADDRESS);
+
+// Clear DAO session
+localStorage.removeItem(LOCAL_STORAGE_KEYS.DAO_ADDRESS);
+```
+
+**Available Keys:**
+
+```tsx
+export const LOCAL_STORAGE_KEYS = {
+  DAO_ADDRESS: "agora_dao_address",
+};
+```
+
+### Roles
+
+**Location:** `constants/roles.ts`
+
+```tsx
+import { ROLES } from "~~/constants/roles";
+
+const hasAdminRole = userRole === ROLES.ADMIN;
+```
+
+## Network Utilities
+
+### NETWORKS_EXTRA_DATA
+
+Additional network metadata.
+
+**Location:** `utils/scaffold-eth/networks.ts`
+
+**Usage:**
+
+```tsx
+import { NETWORKS_EXTRA_DATA } from "~~/utils/scaffold-eth";
+import { mainnet } from "viem/chains";
+
+const networkColor = NETWORKS_EXTRA_DATA[mainnet.id]?.color;
+const networkIcon = NETWORKS_EXTRA_DATA[mainnet.id]?.icon;
+```
+
+## Transaction Utilities
+
+### decodeTxData
+
+Decode transaction calldata.
+
+**Location:** `utils/scaffold-eth/decodeTxData.ts`
+
+**Usage:**
+
+```tsx
+import { decodeTxData } from "~~/utils/scaffold-eth";
+
+const decoded = decodeTxData({
+  abi: contractAbi,
+  data: "0x...",
+});
+
+console.log(decoded.functionName); // "vote"
+console.log(decoded.args); // [1n, true]
+```
+
+## Block Utilities
+
+### fetchPriceFromUniswap
+
+Get token price from Uniswap.
+
+**Location:** `utils/scaffold-eth/fetchPriceFromUniswap.ts`
+
+**Usage:**
+
+```tsx
+import { fetchPriceFromUniswap } from "~~/utils/scaffold-eth";
+
+const ethPrice = await fetchPriceFromUniswap();
+console.log(`ETH Price: $${ethPrice}`);
+```
+
+## TypeScript Utilities
+
+Common TypeScript helper types.
+
+### CommonInputProps
+
+Shared props for input components.
+
+**Location:** `components/scaffold-eth/Input/index.tsx`
+
+```tsx
+import type { CommonInputProps } from "~~/components/scaffold-eth";
+import { Address } from "viem";
+
+type MyInputProps = CommonInputProps<Address> & {
+  customProp: string;
+};
+```
+
+## Utility Composition Example
+
+Combining multiple utilities:
+
+```tsx
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import {
+  getParsedErrorWithAllAbis,
+  getBlockExplorerTxLink,
+} from "~~/utils/scaffold-eth";
+import { isZeroAddress, ZERO_ADDRESS } from "~~/utils/scaffold-eth/common";
+import { parseEther, formatEther } from "viem";
+import { toast } from "sonner";
+import { LOCAL_STORAGE_KEYS } from "~~/constants/localStorage";
+
+function ProposalCreator() {
+  const { writeContractAsync, isMining } = useScaffoldWriteContract({
+    contractName: "AgoraDAO",
+  });
+
+  const createProposal = async (title: string, amount: string) => {
+    // Validate inputs
+    if (!title || title.length === 0) {
+      toast.error("Title is required");
+      return;
+    }
+
+    // Parse and format amount
+    const amountWei = parseEther(amount);
+    console.log(`Creating proposal for ${formatEther(amountWei)} ETH`);
+
+    try {
+      const txHash = await writeContractAsync({
+        functionName: "createProposal",
+        args: [title, amountWei, ZERO_ADDRESS],
+      });
+
+      // Get block explorer link
+      const explorerLink = getBlockExplorerTxLink(chainId, txHash!);
+      
+      toast.success(
+        <div>
+          Proposal created!
+          <a href={explorerLink} target="_blank" rel="noopener noreferrer">
+            View transaction
+          </a>
+        </div>
+      );
+
+      // Store in localStorage
+      const proposals = JSON.parse(
+        localStorage.getItem(LOCAL_STORAGE_KEYS.DAO_ADDRESS) || "[]"
+      );
+      proposals.push({ title, txHash, timestamp: Date.now() });
+      localStorage.setItem(
+        LOCAL_STORAGE_KEYS.DAO_ADDRESS,
+        JSON.stringify(proposals)
+      );
+      
+    } catch (error) {
+      const errorMessage = getParsedErrorWithAllAbis(error, chainId);
+      toast.error(errorMessage);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      const formData = new FormData(e.currentTarget);
+      createProposal(
+        formData.get("title") as string,
+        formData.get("amount") as string
+      );
+    }}>
+      <input name="title" placeholder="Proposal title" />
+      <input name="amount" placeholder="Amount (ETH)" />
+      <button type="submit" disabled={isMining}>
+        {isMining ? "Creating..." : "Create Proposal"}
+      </button>
+    </form>
+  );
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Error Handling">
+    Always use `getParsedErrorWithAllAbis` for user-facing error messages:
+    
+    ```tsx
+    try {
+      await writeContractAsync({ ... });
+    } catch (error) {
+      const message = getParsedErrorWithAllAbis(error, chainId);
+      toast.error(message);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="BigInt Serialization">
+    Use the `replacer` utility when stringifying data with BigInt:
+    
+    ```tsx
+    const data = { amount: parseEther("1.0") };
+    const json = JSON.stringify(data, replacer);
+    localStorage.setItem("data", json);
+    ```
+  </Accordion>
+
+  <Accordion title="Address Validation">
+    Always validate addresses before using them:
+    
+    ```tsx
+    if (!isAddress(userInput)) {
+      throw new Error("Invalid address");
+    }
+    
+    if (isZeroAddress(tokenAddress)) {
+      throw new Error("Zero address not allowed");
+    }
+    
+    const checksummed = getAddress(userInput);
+    ```
+  </Accordion>
+
+  <Accordion title="localStorage Keys">
+    Use constants instead of magic strings:
+    
+    ```tsx
+    // Good
+    localStorage.setItem(LOCAL_STORAGE_KEYS.DAO_ADDRESS, address);
+    
+    // Bad
+    localStorage.setItem("agora_dao_address", address);
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,453 @@
+---
+title: 'Components'
+description: 'React components used throughout the Agora DAO frontend'
+icon: 'cube'
+---
+
+The Agora DAO frontend includes custom React components for DAO management, landing pages, and blockchain interactions. Components are organized into DAO-specific components, Scaffold-ETH utilities, and UI elements.
+
+## DAO Components
+
+Custom components for Agora DAO functionality located in `app/_components/`.
+
+### DaoSetup
+
+Handles DAO session initialization and redirects based on stored DAO address.
+
+**Location:** `app/_components/DaoSetup.tsx`
+
+**Usage:**
+```tsx
+import { DaoSetup } from "~~/app/_components/DaoSetup";
+
+export default function DaoLayout() {
+  return (
+    <>
+      <DaoSetup />
+      {/* Your DAO interface */}
+    </>
+  );
+}
+```
+
+**Features:**
+- Checks localStorage for existing DAO address
+- Redirects to `/daos` if no DAO is selected
+- Shows/hides header based on DAO state
+- Displays loading spinner during transitions
+
+**Dependencies:**
+- `useDaoStore` - DAO state management
+- `useHeaderStore` - Header visibility control
+- `LOCAL_STORAGE_KEYS` - localStorage key constants
+
+### HeroSection
+
+Landing page hero with animated text and wallet connection.
+
+**Location:** `app/_components/HeroSection.tsx`
+
+**Usage:**
+```tsx
+import { HeroSection } from "~~/app/_components/HeroSection";
+
+export default function HomePage() {
+  return <HeroSection />;
+}
+```
+
+**Features:**
+- Animated badge with `DecryptedText` effect
+- Rotating text showcasing DAO features
+- Auto-redirect to `/daos` when wallet connects
+- RainbowKit connect button integration
+
+**Props:** None (uses `useAccount` hook internally)
+
+### FeatureSection
+
+Displays main DAO features in a grid layout.
+
+**Location:** `app/_components/FeatureSection.tsx`
+
+**Usage:**
+```tsx
+import { FeatureSection } from "~~/app/_components/FeatureSection";
+
+export default async function HomePage() {
+  return <FeatureSection />;
+}
+```
+
+**Features:**
+- Server-side component (async)
+- Three main features: Transparent Voting, Gamified Tasks, Reward System
+- Card-based layout with icons
+- Hover effects for better UX
+
+<Note>
+This is a server component (`"use server"`). It cannot use client-side hooks.
+</Note>
+
+## Scaffold-ETH Components
+
+Reusable blockchain components from Scaffold-ETH toolkit.
+
+### Address
+
+Displays Ethereum addresses with ENS resolution and blockie avatars.
+
+**Location:** `components/scaffold-eth/Address/Address.tsx`
+
+**Usage:**
+```tsx
+import { Address } from "~~/components/scaffold-eth";
+
+<Address 
+  address="0x1234567890123456789012345678901234567890"
+  format="short"
+  size="base"
+/>
+```
+
+**Props:**
+
+<ParamField path="address" type="Address" required>
+  Ethereum address to display
+</ParamField>
+
+<ParamField path="disableAddressLink" type="boolean" default="false">
+  Disable block explorer link
+</ParamField>
+
+<ParamField path="format" type="'short' | 'long'" default="'short'">
+  Display format:
+  - `short`: 0x1234...5678
+  - `long`: Full address
+</ParamField>
+
+<ParamField path="size" type="'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl'" default="'base'">
+  Component size affecting text and avatar
+</ParamField>
+
+<ParamField path="onlyEnsOrAddress" type="boolean" default="false">
+  Show only ENS name or address (no dual display)
+</ParamField>
+
+**Features:**
+- Automatic ENS name resolution
+- ENS avatar display
+- Blockie avatar fallback
+- Copy to clipboard functionality
+- Block explorer link integration
+- Loading states with skeleton UI
+
+### Balance
+
+Displays wallet balance with USD conversion toggle.
+
+**Location:** `components/scaffold-eth/Balance.tsx`
+
+**Usage:**
+```tsx
+import { Balance } from "~~/components/scaffold-eth";
+
+<Balance 
+  address={userAddress}
+  usdMode={false}
+  className="text-primary"
+/>
+```
+
+**Props:**
+
+<ParamField path="address" type="Address">
+  Wallet address to display balance for
+</ParamField>
+
+<ParamField path="className" type="string" default="''">
+  Additional CSS classes
+</ParamField>
+
+<ParamField path="usdMode" type="boolean" default="false">
+  Initial display mode (ETH or USD)
+</ParamField>
+
+**Features:**
+- Real-time balance watching
+- Click to toggle between native currency and USD
+- Automatic price fetching
+- Loading skeleton
+- Error handling
+
+**Example with custom styling:**
+```tsx
+<Balance 
+  address={account.address as Address}
+  className="min-h-0 h-auto text-primary"
+  usdMode={true}
+/>
+```
+
+### AddressInput
+
+Input field for Ethereum addresses with ENS resolution.
+
+**Location:** `components/scaffold-eth/Input/AddressInput.tsx`
+
+**Usage:**
+```tsx
+import { AddressInput } from "~~/components/scaffold-eth";
+import { useState } from "react";
+
+const [recipient, setRecipient] = useState("");
+
+<AddressInput
+  name="recipient"
+  placeholder="Enter address or ENS"
+  value={recipient}
+  onChange={setRecipient}
+/>
+```
+
+**Props:**
+
+<ParamField path="value" type="Address | string" required>
+  Current input value
+</ParamField>
+
+<ParamField path="onChange" type="(value: Address) => void" required>
+  Callback when value changes
+</ParamField>
+
+<ParamField path="name" type="string">
+  Input field name
+</ParamField>
+
+<ParamField path="placeholder" type="string">
+  Placeholder text
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disable input
+</ParamField>
+
+**Features:**
+- ENS to address resolution
+- Address to ENS reverse lookup
+- ENS avatar display
+- Blockie preview
+- Debounced ENS lookups (500ms)
+- Error states for invalid addresses
+- Loading indicators
+
+### RainbowKitCustomConnectButton
+
+Custom-styled wallet connection button.
+
+**Location:** `components/scaffold-eth/RainbowKitCustomConnectButton/index.tsx`
+
+**Usage:**
+```tsx
+import { RainbowKitCustomConnectButton } from "~~/components/scaffold-eth/RainbowKitCustomConnectButton";
+
+<RainbowKitCustomConnectButton />
+```
+
+**Props:** None
+
+**Features:**
+- Custom "Conectar Wallet" button text
+- Balance display when connected
+- Network name with color coding
+- Wrong network detection and switching
+- Address dropdown with QR code
+- Block explorer link
+- Fully styled to match Agora DAO theme
+
+### ScaffoldHeader
+
+Main navigation header with wallet connection.
+
+**Location:** `components/ScaffoldHeader.tsx`
+
+**Usage:**
+```tsx
+import { ScaffoldHeader } from "~~/components/ScaffoldHeader";
+
+export default function Layout() {
+  return (
+    <>
+      <ScaffoldHeader />
+      {/* Page content */}
+    </>
+  );
+}
+```
+
+**Features:**
+- Responsive navigation (mobile sidebar toggle)
+- Active route highlighting
+- Menu links: Home, Tasks, Configuration, Debug, Logout
+- Logo with site title
+- RainbowKit integration
+- Faucet button (local networks only)
+- Controlled visibility via `useHeaderStore`
+
+**Menu Links:**
+```tsx
+export const menuLinks: HeaderMenuLink[] = [
+  { label: "Inicio", href: "/dao", icon: <Home /> },
+  { label: "Tareas", href: "/task", icon: <Files /> },
+  { label: "Configuración", href: "/configuration", icon: <Bolt /> },
+  { label: "Debug", href: "/debug", icon: <BugIcon /> },
+  { label: "Cerrar sesión", href: "/logout", icon: <DoorOpenIcon /> },
+];
+```
+
+## UI Components
+
+Custom UI components with animations.
+
+### DecryptedText
+
+Animated text with scrambling/decryption effect.
+
+**Location:** `components/ui/DecryptedText.tsx`
+
+**Usage:**
+```tsx
+import DecryptedText from "~~/components/ui/DecryptedText";
+
+<DecryptedText
+  text="Decentralización en Acción"
+  animateOn="view"
+  speed={100}
+  maxIterations={15}
+  revealDirection="center"
+/>
+```
+
+**Props:**
+
+<ParamField path="text" type="string" required>
+  Text to display and animate
+</ParamField>
+
+<ParamField path="speed" type="number" default="50">
+  Animation speed in milliseconds
+</ParamField>
+
+<ParamField path="maxIterations" type="number" default="10">
+  Number of scramble iterations (non-sequential mode)
+</ParamField>
+
+<ParamField path="sequential" type="boolean" default="false">
+  Reveal characters one by one
+</ParamField>
+
+<ParamField path="revealDirection" type="'start' | 'end' | 'center'" default="'start'">
+  Direction to reveal characters in sequential mode
+</ParamField>
+
+<ParamField path="animateOn" type="'view' | 'hover'" default="'hover'">
+  Trigger animation on viewport intersection or hover
+</ParamField>
+
+<ParamField path="useOriginalCharsOnly" type="boolean" default="false">
+  Use only characters from original text when scrambling
+</ParamField>
+
+<ParamField path="characters" type="string" default="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+">
+  Character set for scrambling effect
+</ParamField>
+
+### RotatingText
+
+Rotates through multiple text strings with animation.
+
+**Location:** `components/ui/RotatingText.tsx`
+
+**Usage:**
+```tsx
+import RotatingText from "~~/components/ui/RotatingText";
+
+<RotatingText
+  texts={["Vota", "Participa", "Gana", "Organiza"]}
+  rotationInterval={2000}
+  staggerFrom="last"
+  mainClassName="text-4xl font-bold text-foreground"
+  elementLevelClassName="text-blue-500"
+/>
+```
+
+**Props:**
+
+<ParamField path="texts" type="string[]" required>
+  Array of texts to rotate through
+</ParamField>
+
+<ParamField path="rotationInterval" type="number" default="3000">
+  Milliseconds between text changes
+</ParamField>
+
+<ParamField path="staggerFrom" type="'first' | 'last' | 'center'" default="'first'">
+  Character animation stagger direction
+</ParamField>
+
+<ParamField path="mainClassName" type="string">
+  CSS classes for main container
+</ParamField>
+
+<ParamField path="elementLevelClassName" type="string">
+  CSS classes for individual text elements
+</ParamField>
+
+## ShadCN UI Components
+
+The project uses [shadcn/ui](https://ui.shadcn.com/) components:
+
+- **Button** - `components/ui/shadcn/button.tsx`
+- **Card** - `components/ui/shadcn/card.tsx`
+- **Badge** - `components/ui/shadcn/badge.tsx`
+- **Input** - `components/ui/shadcn/input.tsx`
+- **Select** - `components/ui/shadcn/select.tsx`
+- **Dialog** - `components/ui/shadcn/dialog.tsx`
+- **Form** - `components/ui/shadcn/form.tsx`
+- **Table** - `components/ui/shadcn/table.tsx`
+- And many more...
+
+<Tip>
+All shadcn components are customizable via Tailwind classes and support dark mode out of the box.
+</Tip>
+
+## Component Composition Example
+
+Here's how components work together:
+
+```tsx
+import { DaoSetup } from "~~/app/_components/DaoSetup";
+import { ScaffoldHeader } from "~~/components/ScaffoldHeader";
+import { Address } from "~~/components/scaffold-eth";
+import { useAccount } from "wagmi";
+
+export default function DaoPage() {
+  const { address } = useAccount();
+
+  return (
+    <>
+      <DaoSetup />
+      <ScaffoldHeader />
+      <main className="container mx-auto p-4">
+        <h1>Welcome to the DAO</h1>
+        {address && (
+          <div className="mt-4">
+            <p>Connected as:</p>
+            <Address address={address} size="lg" format="long" />
+          </div>
+        )}
+      </main>
+    </>
+  );
+}
+```

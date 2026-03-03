@@ -1,0 +1,303 @@
+---
+title: Managing roles
+description: Complete guide to assigning, managing, and revoking roles in your DAO
+---
+
+Roles define what members can do within your DAO. This guide covers how to manage roles and permissions effectively.
+
+## Role types
+
+Agora DAO supports the following role types:
+
+### DEFAULT_ADMIN_ROLE
+
+- **Bytes32 value**: `0x0000000000000000000000000000000000000000000000000000000000000000`
+- **Assigned to**: DAO creator (automatically)
+- **Permissions**: Full control over the DAO, can assign/revoke all roles
+
+### AUDITOR_ROLE
+
+- **Bytes32 value**: `keccak256("AUDITOR_ROLE")`
+- **Assigned by**: Admin only
+- **Permissions**:
+  - View all transactions
+  - Generate reports
+  - Audit proposals
+  - Assign other roles (except AUDITOR and ADMIN roles)
+
+### TASK_MANAGER_ROLE
+
+- **Bytes32 value**: `keccak256("TASK_MANAGER_ROLE")`
+- **Assigned by**: Admin or Auditor
+- **Permissions**:
+  - Create tasks
+  - Assign members to tasks
+  - Set deadlines
+  - Approve deliverables
+
+### PROPOSAL_MANAGER_ROLE
+
+- **Bytes32 value**: `keccak256("PROPOSAL_MANAGER_ROLE")`
+- **Assigned by**: Admin or Auditor
+- **Permissions**: Manage and moderate proposals
+
+### USER_ROLE
+
+- **Bytes32 value**: `keccak256("USER_ROLE")`
+- **Assigned by**: Automatic (when joining DAO)
+- **Permissions**:
+  - Vote on proposals
+  - Create basic proposals
+  - View dashboard
+  - Participate in discussions
+
+## Role constants
+
+Roles are defined in the codebase at `/constants/roles.ts`:
+
+```typescript
+import { keccak256, toHex } from "viem";
+
+export const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const AUDITOR_ROLE = keccak256(toHex("AUDITOR_ROLE"));
+export const TASK_MANAGER_ROLE = keccak256(toHex("TASK_MANAGER_ROLE"));
+export const PROPOSAL_MANAGER_ROLE = keccak256(toHex("PROPOSAL_MANAGER_ROLE"));
+export const USER_ROLE = keccak256(toHex("USER_ROLE"));
+```
+
+## Who can assign roles
+
+Permissions for role assignment are enforced in the `Rol.sol` contract:
+
+### AUDITOR_ROLE assignment
+
+```solidity
+if (_role == AUDITOR_ROLE) {
+    require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can assign AUDITOR_ROLE");
+    require(_role != DEFAULT_ADMIN_ROLE, "Cannot assign DEFAULT_ADMIN_ROLE");
+}
+```
+
+Only admins can assign AUDITOR_ROLE.
+
+### Other roles assignment
+
+```solidity
+require(
+    hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(AUDITOR_ROLE, msg.sender),
+    "Caller must be Admin or Auditor to assign this role"
+);
+```
+
+Admins or Auditors can assign TASK_MANAGER_ROLE, PROPOSAL_MANAGER_ROLE, and USER_ROLE.
+
+<Warning>
+You cannot assign roles to yourself, and the DEFAULT_ADMIN_ROLE cannot be assigned through the standard role assignment process.
+</Warning>
+
+## Assigning roles
+
+<Steps>
+  <Step title="Access role management">
+    Navigate to the Configuration page. Only DAO admins can access this section.
+
+    ```typescript
+    const { data: isAdmin } = useScaffoldReadContract({
+      contractName: "AgoraDao",
+      functionName: "isRole",
+      args: [DEFAULT_ADMIN_ROLE, userAddress],
+      contractAddress: daoAddress
+    });
+    ```
+  </Step>
+
+  <Step title="Select a role to assign">
+    Choose from the available roles: AUDITOR, TASK_MANAGER, or USER.
+  </Step>
+
+  <Step title="Enter user address">
+    Input the Ethereum address of the user you want to assign the role to.
+
+    The address must:
+    - Be a valid Ethereum address (42 characters starting with `0x`)
+    - Not be your own address
+    - Not be `address(0)`
+    - Not already have the role
+
+    ```typescript
+    const checkInputError = (value: string): string | null => {
+      if (value.length > 0 && !value.match(/^0x[a-fA-F0-9]{40}$/)) {
+        return "Por favor, ingresa una dirección válida";
+      }
+      return null;
+    };
+    ```
+
+    From RoleDialog.tsx:46-51
+  </Step>
+
+  <Step title="Submit the transaction">
+    Click the create role button. This calls `registerRole` on the contract:
+
+    ```solidity
+    function registerRole(bytes32 _role, address _user) external {
+        require(_user != address(0), "User address cannot be zero");
+        require(_user != msg.sender, "Caller cannot assign role to self");
+        
+        // Permission checks...
+        
+        require(!isMemberOfRole[_role][_user], "User is already registered in this role's list");
+        require(!hasRole(_role, _user), "User already exists");
+        
+        _grantRole(_role, _user);
+        isMemberOfRole[_role][_user] = true;
+        
+        roleUsers[_role].push(_user);
+        uint256 newPosition = roleUsers[_role].length - 1;
+        memberPosition[_role][_user] = newPosition;
+        
+        emit RoleRegistered(_role, _user, msg.sender);
+    }
+    ```
+
+    From Rol.sol:41-72
+  </Step>
+</Steps>
+
+## Batch role assignment
+
+You can assign roles to multiple users at once using `registerRoleBatch`:
+
+<Steps>
+  <Step title="Add multiple addresses">
+    Click the "+" button to add additional address input fields.
+  </Step>
+
+  <Step title="Enter all addresses">
+    Fill in each address field with valid Ethereum addresses.
+  </Step>
+
+  <Step title="Submit batch assignment">
+    ```typescript
+    await writeAgoraDaoAsync({
+      functionName: "registerRoleBatch",
+      args: [role.bytes, inputs]
+    });
+    ```
+
+    From RoleDialog.tsx:65-68
+  </Step>
+</Steps>
+
+The contract processes each address:
+
+```solidity
+function registerRoleBatch(bytes32 _role, address[] calldata _users) external {
+    // Permission checks...
+    
+    for (uint256 i = 0; i < _users.length; i++) {
+        address currentUser = _users[i];
+        
+        require(currentUser != address(0), "User address cannot be zero");
+        require(currentUser != msg.sender, "Caller cannot assign role to self");
+        require(!isMemberOfRole[_role][currentUser], "User is already registered in this role's list");
+        require(!hasRole(_role, currentUser), "User already exists");
+        
+        _grantRole(_role, currentUser);
+        isMemberOfRole[_role][currentUser] = true;
+        
+        roleUsers[_role].push(currentUser);
+        uint256 newPosition = roleUsers[_role].length - 1;
+        memberPosition[_role][currentUser] = newPosition;
+        
+        emit RoleRegistered(_role, currentUser, msg.sender);
+    }
+}
+```
+
+From Rol.sol:75-108
+
+<Tip>
+Batch role assignment is more gas-efficient when assigning the same role to multiple users.
+</Tip>
+
+## Revoking roles
+
+Only admins can revoke roles using the `deleteRole` function:
+
+```solidity
+function deleteRole(bytes32 _role, address _user) external virtual {
+    require(_user != address(0), "User address cannot be zero");
+    require(_user != msg.sender, "Caller cannot revoke role from self");
+    require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
+    require(isMemberOfRole[_role][_user], "User is not registered in this role's list");
+    require(hasRole(_role, _user), "User does not have this role");
+    
+    _revokeRole(_role, _user);
+    isMemberOfRole[_role][_user] = false;
+    
+    // Efficient array removal
+    uint256 position = memberPosition[_role][_user];
+    uint256 lastPosition = roleUsers[_role].length - 1;
+    if (position != lastPosition) {
+        address lastUser = roleUsers[_role][lastPosition];
+        roleUsers[_role][position] = lastUser;
+        memberPosition[_role][lastUser] = position;
+    }
+    roleUsers[_role].pop();
+    delete memberPosition[_role][_user];
+    
+    emit RoleDeleted(_role, _user, msg.sender);
+}
+```
+
+From Rol.sol:125-149
+
+<Warning>
+You cannot revoke roles from yourself. Another admin must revoke your role if needed.
+</Warning>
+
+## Viewing role members
+
+To see all members with a specific role:
+
+```solidity
+function getMemberByRole(bytes32 _role) external view returns (address[] memory) {
+    return roleUsers[_role];
+}
+```
+
+Or check if a specific user has a role:
+
+```solidity
+function isRole(bytes32 _role, address _user) external view returns (bool) {
+    return hasRole(_role, _user);
+}
+```
+
+From Rol.sol:28-34
+
+## Events
+
+Role changes emit events that can be tracked:
+
+```solidity
+event RoleRegistered(bytes32 indexed role, address indexed user, address indexed executor);
+event RoleDeleted(bytes32 indexed role, address indexed user, address indexed executor);
+```
+
+From Rol.sol:20-21
+
+## Best practices
+
+1. **Start with USER_ROLE** - Let members join and prove themselves before granting elevated roles
+2. **Limit AUDITOR_ROLE** - Only assign to trusted members who need oversight capabilities
+3. **Use batch assignment** - More efficient for assigning roles to multiple users
+4. **Monitor role changes** - Track RoleRegistered and RoleDeleted events
+5. **Regular audits** - Periodically review who has which roles
+
+## Next steps
+
+- Learn about [configuration](/guides/configuration) to set up your development environment
+- See [creating a DAO](/guides/creating-dao) to understand DAO creation
+- Read [joining a DAO](/guides/joining-dao) to understand the member experience

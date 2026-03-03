@@ -1,0 +1,571 @@
+---
+title: Contract deployment
+description: Guide to deploying, verifying, and configuring Agora DAO smart contracts
+---
+
+This guide covers deploying the Agora DAO contracts using Hardhat on various networks.
+
+## Prerequisites
+
+Before deploying, ensure you have:
+
+1. Node.js and Yarn installed
+2. A funded wallet for deployment
+3. RPC provider access (Alchemy, Infura, etc.)
+4. Etherscan API key for verification (optional)
+
+## Quick start
+
+<Steps>
+  <Step title="Generate a deployment account">
+    ```bash
+    cd packages/hardhat
+    yarn account:generate
+    ```
+    
+    This creates an encrypted private key and stores it in `.env`
+  </Step>
+
+  <Step title="Fund your deployment account">
+    ```bash
+    yarn account
+    ```
+    
+    This displays your address and balance on all configured networks
+  </Step>
+
+  <Step title="Deploy to a network">
+    ```bash
+    yarn deploy --network sepolia
+    ```
+    
+    Deploys contracts to Sepolia testnet
+  </Step>
+
+  <Step title="Verify contracts (optional)">
+    ```bash
+    yarn verify --network sepolia
+    ```
+    
+    Verifies source code on Etherscan
+  </Step>
+</Steps>
+
+## Available commands
+
+From `packages/hardhat/package.json`:
+
+```json Key deployment commands
+{
+  "scripts": {
+    "deploy": "ts-node scripts/runHardhatDeployWithPK.ts",
+    "compile": "hardhat compile",
+    "verify": "hardhat etherscan-verify",
+    "hardhat-verify": "hardhat verify",
+    "test": "REPORT_GAS=true hardhat test --network hardhat",
+    "clean": "hardhat clean"
+  }
+}
+```
+
+<AccordionGroup>
+  <Accordion title="yarn compile">
+    Compiles all Solidity contracts in `contracts/` directory.
+    
+    ```bash
+    yarn compile
+    ```
+    
+    Output: Artifacts in `artifacts/` and type definitions in `typechain-types/`
+  </Accordion>
+
+  <Accordion title="yarn deploy">
+    Runs deployment scripts in `deploy/` directory in order.
+    
+    ```bash
+    # Deploy to local Hardhat network
+    yarn deploy
+    
+    # Deploy to specific network
+    yarn deploy --network sepolia
+    yarn deploy --network base
+    yarn deploy --network polygonAmoy
+    ```
+    
+    Scripts are executed in alphabetical order:
+    1. `00_deploy_agora_factory.ts`
+    2. `01_deploy_agora_dao.ts`
+  </Accordion>
+
+  <Accordion title="yarn verify">
+    Verifies deployed contracts on Etherscan-compatible explorers.
+    
+    ```bash
+    yarn verify --network sepolia
+    ```
+    
+    Requires `ETHERSCAN_V2_API_KEY` in `.env`
+  </Accordion>
+
+  <Accordion title="yarn test">
+    Runs test suite with gas reporting.
+    
+    ```bash
+    yarn test
+    ```
+    
+    Tests are located in `test/` directory
+  </Accordion>
+</AccordionGroup>
+
+## Network configuration
+
+Supported networks from `hardhat.config.ts:48-129`:
+
+### Mainnet networks
+
+<CardGroup cols={2}>
+  <Card title="Ethereum" icon="ethereum">
+    ```bash
+    yarn deploy --network mainnet
+    ```
+  </Card>
+  <Card title="Arbitrum" icon="layer-group">
+    ```bash
+    yarn deploy --network arbitrum
+    ```
+  </Card>
+  <Card title="Optimism" icon="circle-o">
+    ```bash
+    yarn deploy --network optimism
+    ```
+  </Card>
+  <Card title="Polygon" icon="p">
+    ```bash
+    yarn deploy --network polygon
+    ```
+  </Card>
+  <Card title="Base" icon="b">
+    ```bash
+    yarn deploy --network base
+    ```
+  </Card>
+  <Card title="Scroll" icon="scroll">
+    ```bash
+    yarn deploy --network scroll
+    ```
+  </Card>
+  <Card title="Celo" icon="mobile">
+    ```bash
+    yarn deploy --network celo
+    ```
+  </Card>
+  <Card title="Gnosis" icon="link">
+    ```bash
+    yarn deploy --network gnosis
+    ```
+  </Card>
+</CardGroup>
+
+### Testnet networks
+
+<CardGroup cols={3}>
+  <Card title="Sepolia" icon="flask">
+    ```bash
+    yarn deploy --network sepolia
+    ```
+  </Card>
+  <Card title="Arbitrum Sepolia" icon="flask">
+    ```bash
+    yarn deploy --network arbitrumSepolia
+    ```
+  </Card>
+  <Card title="Optimism Sepolia" icon="flask">
+    ```bash
+    yarn deploy --network optimismSepolia
+    ```
+  </Card>
+  <Card title="Polygon Amoy" icon="flask">
+    ```bash
+    yarn deploy --network polygonAmoy
+    ```
+  </Card>
+  <Card title="Base Sepolia" icon="flask">
+    ```bash
+    yarn deploy --network baseSepolia
+    ```
+  </Card>
+  <Card title="Scroll Sepolia" icon="flask">
+    ```bash
+    yarn deploy --network scrollSepolia
+    ```
+  </Card>
+</CardGroup>
+
+### Network configuration details
+
+All networks use Alchemy RPC endpoints (except Gnosis, Chiado, Base, and Celo which use public RPCs):
+
+```typescript From hardhat.config.ts:61-64
+sepolia: {
+  url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
+  accounts: [deployerPrivateKey],
+}
+```
+
+Set your Alchemy API key in `.env`:
+
+```bash
+ALCHEMY_API_KEY=your_api_key_here
+```
+
+## Constructor parameters
+
+### AgoraDaoFactory
+
+The factory contract requires one parameter: the initial owner address.
+
+```solidity From AgoraDaoFactory.sol:43
+constructor(address initialOwner) Ownable(initialOwner) {
+    daoCategories.push("SERVICE");
+    daoCategories.push("GOVERNANCE");
+    daoCategories.push("SOCIAL IMPACT");
+    daoCategories.push("ENERGY");
+}
+```
+
+**Deployment script** (`deploy/00_deploy_agora_factory.ts:25-34`):
+
+```typescript
+await deploy("AgoraDaoFactory", {
+  from: deployer,
+  args: [deployer],  // Sets deployer as initial owner
+  log: true,
+  autoMine: true,
+});
+```
+
+<Note>
+  The deployer address is automatically used as the initial owner. This can be changed to a multisig or DAO governance address.
+</Note>
+
+### AgoraDao
+
+Individual DAO contracts require two parameters:
+
+```solidity From AgoraDao.sol:27-32
+constructor(address _fabric, address _creator) {
+    fabric = _fabric;                           // Parent factory address
+    _grantRole(DEFAULT_ADMIN_ROLE, _creator);  // Grant admin to creator
+    userCounter++;
+}
+```
+
+**Deployment script** (`deploy/01_deploy_agora_dao.ts:25-34`):
+
+```typescript
+await deploy("AgoraDao", {
+  from: deployer,
+  args: [
+    "0x486dd25072a665db79330b1DEDc4Bac473148019",  // Factory address
+    "0x486dd25072a665db79330b1DEDc4Bac473148019"   // Creator address
+  ],
+  log: true,
+  autoMine: true,
+});
+```
+
+<Warning>
+  In production, individual DAOs are created via `AgoraDaoFactory.createDao()`, not directly deployed. The deployment script above is for testing purposes only.
+</Warning>
+
+## Deployment scripts
+
+Deployment scripts are located in `packages/hardhat/deploy/` and use Hardhat Deploy.
+
+### Factory deployment
+
+**File:** `deploy/00_deploy_agora_factory.ts`
+
+```typescript
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { DeployFunction } from "hardhat-deploy/types";
+
+const deployAgoraDaoFactory: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+  const { deployer } = await hre.getNamedAccounts();
+  const { deploy } = hre.deployments;
+
+  await deploy("AgoraDaoFactory", {
+    from: deployer,
+    args: [deployer],  // initialOwner
+    log: true,
+    autoMine: true,
+  });
+};
+
+export default deployAgoraDaoFactory;
+deployAgoraDaoFactory.tags = ["AgoraDaoFactory"];
+```
+
+**Usage:**
+
+```bash
+# Deploy only the factory
+yarn deploy --tags AgoraDaoFactory --network sepolia
+```
+
+### Custom deployment script
+
+To deploy with custom parameters:
+
+```typescript deploy/00_deploy_agora_factory.ts
+await deploy("AgoraDaoFactory", {
+  from: deployer,
+  args: [
+    "0xYourMultisigAddress"  // Use multisig as owner
+  ],
+  log: true,
+  autoMine: true,
+});
+```
+
+## Verification process
+
+After deployment, verify your contracts on block explorers:
+
+### Automatic verification
+
+```bash
+yarn verify --network sepolia
+```
+
+This runs `hardhat-deploy`'s built-in verification using configuration from `hardhat.config.ts:135-139`:
+
+```typescript
+verify: {
+  etherscan: {
+    apiKey: `${etherscanApiKey}`,
+  },
+}
+```
+
+### Manual verification
+
+For manual verification or troubleshooting:
+
+```bash
+yarn hardhat-verify --network sepolia \
+  --contract contracts/AgoraDaoFactory.sol:AgoraDaoFactory \
+  DEPLOYED_ADDRESS \
+  CONSTRUCTOR_ARGS
+```
+
+**Example:**
+
+```bash
+yarn hardhat-verify --network sepolia \
+  --contract contracts/AgoraDaoFactory.sol:AgoraDaoFactory \
+  0x1234567890123456789012345678901234567890 \
+  0xDeployerAddress
+```
+
+### Etherscan API key
+
+Set in `.env`:
+
+```bash
+ETHERSCAN_V2_API_KEY=your_api_key_here
+```
+
+Get API keys from:
+- Ethereum: https://etherscan.io/myapikey
+- Polygon: https://polygonscan.com/myapikey
+- Arbitrum: https://arbiscan.io/myapikey
+- Optimism: https://optimistic.etherscan.io/myapikey
+- Base: https://basescan.org/myapikey
+
+## Production deployment example
+
+Complete deployment flow for production:
+
+<Steps>
+  <Step title="Import your deployment wallet">
+    ```bash
+    yarn account:import
+    ```
+    
+    Enter your private key when prompted (stored encrypted)
+  </Step>
+
+  <Step title="Configure environment">
+    Edit `.env`:
+    ```bash
+    ALCHEMY_API_KEY=your_alchemy_key
+    ETHERSCAN_V2_API_KEY=your_etherscan_key
+    ```
+  </Step>
+
+  <Step title="Verify account balance">
+    ```bash
+    yarn account
+    ```
+    
+    Ensure sufficient balance on target network
+  </Step>
+
+  <Step title="Compile contracts">
+    ```bash
+    yarn compile
+    ```
+    
+    Verify successful compilation
+  </Step>
+
+  <Step title="Run tests">
+    ```bash
+    yarn test
+    ```
+    
+    Ensure all tests pass
+  </Step>
+
+  <Step title="Deploy to testnet first">
+    ```bash
+    yarn deploy --network sepolia
+    ```
+    
+    Test on testnet before mainnet
+  </Step>
+
+  <Step title="Verify on testnet">
+    ```bash
+    yarn verify --network sepolia
+    ```
+  </Step>
+
+  <Step title="Deploy to mainnet">
+    ```bash
+    yarn deploy --network mainnet
+    ```
+    
+    Double-check network before confirming
+  </Step>
+
+  <Step title="Verify on mainnet">
+    ```bash
+    yarn verify --network mainnet
+    ```
+  </Step>
+
+  <Step title="Transfer ownership (optional)">
+    Transfer factory ownership to multisig or DAO governance
+  </Step>
+</Steps>
+
+## Post-deployment configuration
+
+After deployment, you may want to:
+
+### Add custom DAO categories
+
+```solidity
+// Only factory owner can add categories
+agoraDaoFactory.addDaoCategory("DEFI");
+agoraDaoFactory.addDaoCategory("NFT");
+```
+
+### Transfer ownership
+
+```solidity
+// Transfer to multisig or governance contract
+agoraDaoFactory.transferOwnership(multisigAddress);
+```
+
+### Create initial DAOs
+
+```solidity
+agoraDaoFactory.createDao(
+  "Example DAO",
+  "A description of the DAO",
+  0,  // categoryID (0 = SERVICE)
+  "ipfs://QmImageHash"
+);
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Insufficient funds error">
+    **Error:** `sender doesn't have enough funds to send tx`
+    
+    **Solution:** Fund your deployment account:
+    ```bash
+    yarn account  # Get your address
+    ```
+    Send ETH to the displayed address on your target network.
+  </Accordion>
+
+  <Accordion title="Nonce too high error">
+    **Error:** `nonce has already been used`
+    
+    **Solution:** Reset your local deployment state:
+    ```bash
+    yarn clean
+    rm -rf deployments/[network_name]
+    ```
+  </Accordion>
+
+  <Accordion title="Verification failed">
+    **Error:** `already verified` or `does not match`
+    
+    **Solution:** Ensure constructor args match exactly:
+    ```bash
+    yarn hardhat-verify --network sepolia \
+      --contract contracts/AgoraDaoFactory.sol:AgoraDaoFactory \
+      ADDRESS \
+      CORRECT_ARGS
+    ```
+  </Accordion>
+
+  <Accordion title="Network connection issues">
+    **Error:** `request failed` or `timeout`
+    
+    **Solution:** Check RPC endpoint:
+    - Verify Alchemy API key in `.env`
+    - Try alternative RPC (Infura, QuickNode)
+    - Check network status
+  </Accordion>
+</AccordionGroup>
+
+## Gas optimization
+
+The contracts are compiled with optimizer settings from `hardhat.config.ts:31-36`:
+
+```typescript
+optimizer: {
+  enabled: true,
+  runs: 200,
+}
+```
+
+**Runs: 200** balances deployment cost vs runtime cost:
+- Lower runs (100) = cheaper deployment, higher execution cost
+- Higher runs (1000) = expensive deployment, cheaper execution
+- 200 is a good balance for most use cases
+
+To view gas costs during testing:
+
+```bash
+REPORT_GAS=true yarn test
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/contracts/architecture">
+    Understand contract structure and relationships
+  </Card>
+  <Card title="Overview" icon="book" href="/contracts/overview">
+    Return to smart contracts overview
+  </Card>
+</CardGroup>

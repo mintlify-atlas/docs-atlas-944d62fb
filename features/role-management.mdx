@@ -1,0 +1,394 @@
+---
+title: Role management
+description: Comprehensive guide to Agora DAO's role-based access control (RBAC) system
+---
+
+## Overview
+
+Agora DAO implements a sophisticated role-based access control (RBAC) system built on OpenZeppelin's AccessControl. This system allows DAO admins to assign granular permissions to members, creating a flexible governance structure.
+
+## Role types
+
+Agora DAO defines five distinct roles, each with specific permissions and responsibilities:
+
+<CardGroup cols={2}>
+  <Card title="DEFAULT_ADMIN_ROLE" icon="crown" color="#f59e0b">
+    Highest authority - can assign all roles and manage DAO settings
+  </Card>
+  <Card title="AUDITOR_ROLE" icon="search" color="#f59e0b">
+    Can review and audit transactions, assign non-admin roles
+  </Card>
+  <Card title="TASK_MANAGER_ROLE" icon="list-check" color="#3b82f6">
+    Can create, assign, and manage tasks within the DAO
+  </Card>
+  <Card title="PROPOSAL_MANAGER_ROLE" icon="gavel" color="#3b82f6">
+    Can manage proposals and voting processes
+  </Card>
+  <Card title="USER_ROLE" icon="user" color="#10b981">
+    Base membership with voting and basic proposal rights
+  </Card>
+</CardGroup>
+
+## Role definitions
+
+Roles are defined as bytes32 constants using keccak256 hashing:
+
+<CodeGroup>
+```solidity Rol.sol
+abstract contract Rol is AccessControl {
+    bytes32 internal constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+    bytes32 internal constant TASK_MANAGER_ROLE = keccak256("TASK_MANAGER_ROLE");
+    bytes32 internal constant PROPOSAL_MANAGER_ROLE = keccak256("PROPOSAL_MANAGER_ROLE");
+    bytes32 internal constant USER_ROLE = keccak256("USER_ROLE");
+}
+```
+
+```typescript Frontend constants
+import { keccak256, toHex } from "viem";
+
+export const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const AUDITOR_ROLE = keccak256(toHex("AUDITOR_ROLE"));
+export const TASK_MANAGER_ROLE = keccak256(toHex("TASK_MANAGER_ROLE"));
+export const PROPOSAL_MANAGER_ROLE = keccak256(toHex("PROPOSAL_MANAGER_ROLE"));
+export const USER_ROLE = keccak256(toHex("USER_ROLE"));
+```
+</CodeGroup>
+
+<Note>
+The `DEFAULT_ADMIN_ROLE` is a special role with bytes32 value of 0x00...00. It's automatically granted to the DAO creator during deployment.
+</Note>
+
+## Assigning roles
+
+### Single role assignment
+
+Admins and auditors can assign roles to individual users:
+
+```solidity Rol.sol:41-72
+function registerRole(bytes32 _role, address _user) external {
+    require(_user != address(0), "User address cannot be zero");
+    require(_user != msg.sender, "Caller cannot assign role to self");
+
+    // Verify Permissions
+    if (_role == AUDITOR_ROLE) {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can assign AUDITOR_ROLE");
+        require(_role != DEFAULT_ADMIN_ROLE, "Cannot assign DEFAULT_ADMIN_ROLE");
+    } else {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(AUDITOR_ROLE, msg.sender),
+            "Caller must be Admin or Auditor to assign this role"
+        );
+    }
+
+    if (hasRole(DEFAULT_ADMIN_ROLE, _user)) {
+        require(_role == DEFAULT_ADMIN_ROLE, "Admin cannot assign other roles to self");
+    }
+
+    require(!isMemberOfRole[_role][_user], "User is already registered in this role's list");
+    require(!hasRole(_role, _user), "User already exists");
+
+    // Assign Role
+    _grantRole(_role, _user);
+    isMemberOfRole[_role][_user] = true;
+
+    roleUsers[_role].push(_user);
+    uint256 newPosition = roleUsers[_role].length - 1;
+    memberPosition[_role][_user] = newPosition;
+
+    emit RoleRegistered(_role, _user, msg.sender);
+}
+```
+
+<ParamField path="_role" type="bytes32" required>
+  The role identifier to assign (e.g., TASK_MANAGER_ROLE)
+</ParamField>
+
+<ParamField path="_user" type="address" required>
+  The address receiving the role
+</ParamField>
+
+### Batch role assignment
+
+For efficiency, you can assign the same role to multiple users in one transaction:
+
+```solidity Rol.sol:75-108
+function registerRoleBatch(bytes32 _role, address[] calldata _users) external {
+    if (_role == AUDITOR_ROLE) {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can assign AUDITOR_ROLE");
+        require(_role != DEFAULT_ADMIN_ROLE, "Cannot assign DEFAULT_ADMIN_ROLE");
+    } else {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(AUDITOR_ROLE, msg.sender),
+            "Caller must be Admin or Auditor to assign this role"
+        );
+    }
+
+    for (uint256 i = 0; i < _users.length; i++) {
+        address currentUser = _users[i];
+
+        require(currentUser != address(0), "User address cannot be zero");
+        require(currentUser != msg.sender, "Caller cannot assign role to self");
+
+        require(!isMemberOfRole[_role][currentUser], "User is already registered in this role's list");
+        require(!hasRole(_role, currentUser), "User already exists");
+
+        if (hasRole(DEFAULT_ADMIN_ROLE, currentUser)) {
+            require(_role == DEFAULT_ADMIN_ROLE, "Admin cannot assign other roles to self");
+        }
+
+        _grantRole(_role, currentUser);
+        isMemberOfRole[_role][currentUser] = true;
+
+        roleUsers[_role].push(currentUser);
+        uint256 newPosition = roleUsers[_role].length - 1;
+        memberPosition[_role][currentUser] = newPosition;
+
+        emit RoleRegistered(_role, currentUser, msg.sender);
+    }
+}
+```
+
+<Info>
+Batch assignment is more gas-efficient when assigning the same role to multiple users. Each user still gets individual validation and event emission.
+</Info>
+
+## Permission hierarchy
+
+The role system has a clear permission hierarchy:
+
+### Admin permissions (DEFAULT_ADMIN_ROLE)
+
+- Assign **any role** including AUDITOR_ROLE
+- Revoke **any role** from any user
+- Manage DAO configuration
+- Full access to all DAO functions
+
+### Auditor permissions (AUDITOR_ROLE)
+
+- Assign **non-admin roles** (TASK_MANAGER, PROPOSAL_MANAGER, USER)
+- View all transactions and proposals
+- Generate audit reports
+- Cannot assign AUDITOR_ROLE or DEFAULT_ADMIN_ROLE
+
+### Manager permissions
+
+**TASK_MANAGER_ROLE:**
+- Create and assign tasks
+- Set task deadlines
+- Approve task deliveries
+- Manage task escrow
+
+**PROPOSAL_MANAGER_ROLE:**
+- Create and manage proposals
+- Configure voting parameters
+- Execute approved proposals
+
+### User permissions (USER_ROLE)
+
+- Vote on proposals
+- Create basic proposals
+- View DAO dashboard
+- Participate in discussions
+
+<Warning>
+Users cannot assign themselves roles. All role assignments must come from an admin or auditor (except when joining the DAO, which auto-assigns USER_ROLE).
+</Warning>
+
+## Revoking roles
+
+Only admins can revoke roles using the `deleteRole()` function:
+
+```solidity Rol.sol:125-149
+function deleteRole(bytes32 _role, address _user) external virtual {
+    require(_user != address(0), "User address cannot be zero");
+    require(_user != msg.sender, "Caller cannot revoke role from self");
+
+    require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
+
+    require(isMemberOfRole[_role][_user], "User is not registered in this role's list");
+    require(hasRole(_role, _user), "User does not have this role");
+
+    // Revoke Role
+    _revokeRole(_role, _user);
+    isMemberOfRole[_role][_user] = false;
+
+    uint256 position = memberPosition[_role][_user];
+    uint256 lastPosition = roleUsers[_role].length - 1;
+    if (position != lastPosition) {
+        address lastUser = roleUsers[_role][lastPosition];
+        roleUsers[_role][position] = lastUser;
+        memberPosition[_role][lastUser] = position;
+    }
+    roleUsers[_role].pop();
+    delete memberPosition[_role][_user];
+
+    emit RoleDeleted(_role, _user, msg.sender);
+}
+```
+
+The function uses an efficient swap-and-pop pattern to remove users from the role array without leaving gaps.
+
+## Querying roles
+
+The contract provides several view functions for role queries:
+
+<CodeGroup>
+```solidity Check if user has role
+function isRole(bytes32 _role, address _user) external view returns (bool) {
+    return hasRole(_role, _user);
+}
+```
+
+```solidity Get all users with a role
+function getMemberByRole(bytes32 _role) external view returns (address[] memory) {
+    return roleUsers[_role];
+}
+```
+
+```solidity Alternative getter
+function getAllByRole(bytes32 _role) external view returns (address[] memory) {
+    return roleUsers[_role];
+}
+```
+</CodeGroup>
+
+## Frontend implementation
+
+The Agora frontend provides a role management UI in the configuration page:
+
+### Role configuration component
+
+```typescript RoleConfig.tsx
+const initialRoles: Role[] = [
+  {
+    name: "AUDITOR",
+    bytes: AUDITOR_ROLE,
+    description: "Puede revisar y auditar todas las transacciones y propuestas de la DAO",
+    permissions: ["Ver transacciones", "Generar reportes", "Auditar propuestas", "Acceso de solo lectura"],
+    color: "bg-amber-500",
+  },
+  {
+    name: "TASK_MANAGER",
+    bytes: TASK_MANAGER_ROLE,
+    description: "Gestiona y asigna tareas dentro de la organización",
+    permissions: ["Crear tareas", "Asignar miembros", "Establecer deadlines", "Aprobar entregas"],
+    color: "bg-blue-500",
+  },
+  {
+    name: "USUARIO",
+    bytes: USER_ROLE,
+    description: "Miembro estándar con capacidad de votar y crear propuestas básicas",
+    permissions: ["Votar propuestas", "Crear propuestas", "Ver dashboard", "Participar en discusiones"],
+    color: "bg-emerald-500",
+  },
+];
+```
+
+### Assigning roles from the UI
+
+```typescript RoleDialog.tsx
+const { writeContractAsync: writeAgoraDaoAsync } = useScaffoldWriteContract({
+  contractName: "AgoraDao",
+  contractAddress: daoAddress,
+});
+
+const handleSave = async () => {
+  if (inputs.length > 1) {
+    // Batch assignment
+    await writeAgoraDaoAsync({
+      functionName: "registerRoleBatch",
+      args: [role.bytes, inputs],
+    });
+  } else {
+    // Single assignment
+    await writeAgoraDaoAsync({
+      functionName: "registerRole",
+      args: [role.bytes, inputs[0]],
+    });
+  }
+};
+```
+
+### Admin-only access control
+
+```typescript
+const { data: isAdmin } = useScaffoldReadContract({
+  contractName: "AgoraDao",
+  functionName: "isRole",
+  args: [DEFAULT_ADMIN_ROLE, userAddress],
+  contractAddress: daoAddress,
+});
+
+if (!isAdmin) {
+  return <div>Only admin can access role management</div>;
+}
+```
+
+## Events
+
+Role changes emit events for off-chain tracking:
+
+### RoleRegistered event
+
+```solidity Rol.sol:20
+event RoleRegistered(bytes32 indexed role, address indexed user, address indexed executor);
+```
+
+Emitted when a role is assigned:
+- `role`: The role identifier
+- `user`: Address receiving the role
+- `executor`: Address that performed the assignment
+
+### RoleDeleted event
+
+```solidity Rol.sol:21
+event RoleDeleted(bytes32 indexed role, address indexed user, address indexed executor);
+```
+
+Emitted when a role is revoked:
+- `role`: The role identifier
+- `user`: Address losing the role
+- `executor`: Admin who revoked the role
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Principle of least privilege" icon="shield-halved">
+    Only assign roles that members actually need for their responsibilities
+  </Card>
+  <Card title="Regular audits" icon="magnifying-glass">
+    Use AUDITOR_ROLE to regularly review role assignments and access patterns
+  </Card>
+  <Card title="Distribute admin power" icon="users">
+    Consider having multiple admins for redundancy and security
+  </Card>
+  <Card title="Document role assignments" icon="file-lines">
+    Keep off-chain records of why specific roles were assigned
+  </Card>
+</CardGroup>
+
+## Security considerations
+
+<Warning>
+**Important security features:**
+
+- Users cannot assign roles to themselves
+- Only admins can assign AUDITOR_ROLE
+- Admins cannot revoke their own roles
+- Role assignment requires explicit admin or auditor permission
+- DEFAULT_ADMIN_ROLE cannot be programmatically assigned
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Task management" icon="list-check" href="/features/task-management">
+    Learn how TASK_MANAGER_ROLE manages DAO tasks
+  </Card>
+  <Card title="DAO membership" icon="users" href="/features/dao-membership">
+    Understand how users join and receive USER_ROLE
+  </Card>
+  <Card title="Rewards" icon="coins" href="/features/rewards">
+    Discover reward systems for role holders
+  </Card>
+</CardGroup>

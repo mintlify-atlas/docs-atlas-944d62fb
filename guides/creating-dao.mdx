@@ -1,0 +1,135 @@
+---
+title: Creating a DAO
+description: Step-by-step guide to creating your own DAO on Agora DAO platform
+---
+
+This guide walks you through the process of creating a new DAO on the Agora DAO platform.
+
+## Prerequisites
+
+Before creating a DAO, ensure you have:
+
+- An Ethereum wallet (MetaMask, WalletConnect, etc.)
+- Sufficient ETH for gas fees
+- Connected your wallet to the Agora DAO application
+
+<Warning>
+Make sure you're connected to the correct network before creating your DAO. The default network is configured in `scaffold.config.ts`.
+</Warning>
+
+## Creating your DAO
+
+<Steps>
+  <Step title="Navigate to the DAO creation page">
+    Click the "Create DAO" button on the DAOs page. The button will display rotating text like "Crear DAO", "Lanzar DAO", or "Descentralizar ahora".
+  </Step>
+
+  <Step title="Enter DAO name">
+    Provide a name for your DAO (2-30 characters).
+
+    ```typescript
+    name: z
+      .string()
+      .trim()
+      .min(2, { message: "DAO name must be at least 2 characters." })
+      .max(30, { message: "Character limit exceeded" })
+    ```
+
+    Example: "ETH Force"
+  </Step>
+
+  <Step title="Write a description">
+    Add a description (15-300 characters) that explains your DAO's purpose.
+
+    Example: "Un organismo autónomo descentralizado enfocado en potenciar comunidades a través de la gobernanza basada en blockchain, financiando iniciativas de impacto social y promoviendo decisiones transparentes."
+  </Step>
+
+  <Step title="Select a category">
+    Choose a category that best describes your DAO:
+
+    - **SERVICE** - Service-oriented DAOs
+    - **GOVERNANCE** - Governance-focused DAOs
+    - **SOCIAL IMPACT** - Social impact initiatives
+    - **ENERGY** - Energy sector DAOs
+
+    These categories are defined in the `AgoraDaoFactory` contract:
+
+    ```solidity
+    constructor(address initialOwner) Ownable(initialOwner) {
+        daoCategories.push("SERVICE");
+        daoCategories.push("GOVERNANCE");
+        daoCategories.push("SOCIAL IMPACT");
+        daoCategories.push("ENERGY");
+    }
+    ```
+  </Step>
+
+  <Step title="Upload a logo (optional)">
+    Upload an image file to represent your DAO:
+
+    - Supported formats: `.jpeg`, `.png`, `.jpg`
+    - Maximum file size: 1 MB
+    - Recommended dimensions: 100x100 pixels
+
+    The image will be uploaded to IPFS and stored with your DAO metadata.
+
+    <Tip>
+    You can drag and drop your logo or click to browse files. The logo can be updated later.
+    </Tip>
+  </Step>
+
+  <Step title="Review and submit">
+    Click "Lanzar DAO" to create your DAO. This will:
+
+    1. Upload your logo to IPFS (if provided)
+    2. Call the `createDao` function on the `AgoraDaoFactory` contract
+    3. Deploy a new `AgoraDao` contract instance
+    4. Emit a `DaoCreated` event
+
+    ```solidity
+    await writeAgoraDaoFabricAsync({
+      functionName: "createDao",
+      args: [data.name, data.description, BigInt(data.categories), res?.cid || ""]
+    });
+    ```
+  </Step>
+
+  <Step title="Confirm the transaction">
+    Your wallet will prompt you to confirm the transaction. Review the gas fees and confirm.
+
+    <Note>
+    The transaction may take a few moments to be confirmed on the blockchain.
+    </Note>
+  </Step>
+</Steps>
+
+## What happens after creation
+
+Once your DAO is created:
+
+1. **You become the admin** - The creator is automatically granted `DEFAULT_ADMIN_ROLE`
+2. **DAO is deployed** - A new `AgoraDao` contract is deployed at a unique address
+3. **User counter increments** - Your address is added to the platform's user counter
+4. **DAO is listed** - Your DAO appears in the public DAO list
+5. **Event emitted** - A `DaoCreated` event is emitted with your DAO's ID and details
+
+From the `AgoraDao` contract constructor (AgoraDao.sol:27-32):
+
+```solidity
+constructor(address _fabric, address _creator) {
+    fabric = _fabric;
+    _grantRole(DEFAULT_ADMIN_ROLE, _creator);
+    
+    userCounter++;
+}
+```
+
+## Next steps
+
+- [Join a DAO](/guides/joining-dao) to see the member experience
+- [Manage roles](/guides/managing-roles) to assign permissions to members
+- [Configure your DAO](/guides/configuration) to customize settings
+
+<Warning>
+As the DAO creator, you have full admin privileges. Be careful when assigning roles and managing permissions.
+</Warning>

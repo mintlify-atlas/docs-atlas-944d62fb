@@ -1,0 +1,649 @@
+---
+title: 'Hooks'
+description: 'Custom React hooks for blockchain interactions and state management'
+icon: 'hook'
+---
+
+Agora DAO provides a collection of custom React hooks built on top of wagmi and viem for seamless smart contract interactions.
+
+## Scaffold-ETH Hooks
+
+Powerful hooks that simplify blockchain interactions with automatic ABI loading and type safety.
+
+### useScaffoldReadContract
+
+Read data from smart contracts with automatic ABI resolution.
+
+**Location:** `hooks/scaffold-eth/useScaffoldReadContract.ts`
+
+**Usage:**
+
+<Tabs>
+  <Tab title="Basic Read">
+    ```tsx
+    import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+
+    function DaoInfo() {
+      const { data: daoName } = useScaffoldReadContract({
+        contractName: "AgoraDAO",
+        functionName: "name",
+      });
+
+      return <h1>{daoName}</h1>;
+    }
+    ```
+  </Tab>
+  <Tab title="With Arguments">
+    ```tsx
+    import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+
+    function ProposalDetails({ proposalId }: { proposalId: bigint }) {
+      const { data: proposal } = useScaffoldReadContract({
+        contractName: "AgoraDAO",
+        functionName: "getProposal",
+        args: [proposalId],
+      });
+
+      return (
+        <div>
+          <p>Title: {proposal?.title}</p>
+          <p>Votes: {proposal?.votes.toString()}</p>
+        </div>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="Multi-Chain">
+    ```tsx
+    import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+    import { optimism } from "viem/chains";
+
+    function CrossChainData() {
+      const { data: balance } = useScaffoldReadContract({
+        contractName: "TokenContract",
+        functionName: "balanceOf",
+        args: [userAddress],
+        chainId: optimism.id,
+      });
+
+      return <p>Balance on Optimism: {balance?.toString()}</p>;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+**Parameters:**
+
+<ParamField path="contractName" type="ContractName" required>
+  Name of the deployed contract (from `deployedContracts.ts`)
+</ParamField>
+
+<ParamField path="functionName" type="string" required>
+  Contract function to call (view or pure)
+</ParamField>
+
+<ParamField path="args" type="unknown[]">
+  Function arguments as array
+</ParamField>
+
+<ParamField path="chainId" type="number">
+  Target chain ID for multi-chain support
+</ParamField>
+
+<ParamField path="contractAddress" type="string">
+  Override deployed contract address
+</ParamField>
+
+<ParamField path="watch" type="boolean" default="true">
+  Automatically refetch on new blocks
+</ParamField>
+
+**Returns:**
+
+- `data` - Contract function return value
+- `isLoading` - Initial loading state
+- `isError` - Error state
+- `error` - Error object
+- `refetch()` - Manual refetch function
+
+### useScaffoldWriteContract
+
+Write to smart contracts with transaction handling.
+
+**Location:** `hooks/scaffold-eth/useScaffoldWriteContract.ts`
+
+**Usage:**
+
+<Tabs>
+  <Tab title="Basic Write">
+    ```tsx
+    import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+
+    function CreateProposal() {
+      const { writeContractAsync, isMining } = useScaffoldWriteContract({
+        contractName: "AgoraDAO",
+      });
+
+      const handleCreate = async () => {
+        try {
+          await writeContractAsync({
+            functionName: "createProposal",
+            args: ["Proposal Title", "Description"],
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      return (
+        <button onClick={handleCreate} disabled={isMining}>
+          {isMining ? "Creating..." : "Create Proposal"}
+        </button>
+      );
+    }
+    ```
+  </Tab>
+  <Tab title="Payable Function">
+    ```tsx
+    import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+    import { parseEther } from "viem";
+
+    function JoinDAO() {
+      const { writeContractAsync } = useScaffoldWriteContract({
+        contractName: "AgoraDAO",
+      });
+
+      const handleJoin = async () => {
+        await writeContractAsync({
+          functionName: "join",
+          value: parseEther("0.1"), // 0.1 ETH membership fee
+        });
+      };
+
+      return <button onClick={handleJoin}>Join DAO (0.1 ETH)</button>;
+    }
+    ```
+  </Tab>
+  <Tab title="With Callbacks">
+    ```tsx
+    import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+
+    function Vote({ proposalId }: { proposalId: bigint }) {
+      const { writeContractAsync } = useScaffoldWriteContract({
+        contractName: "AgoraDAO",
+      });
+
+      const handleVote = async (support: boolean) => {
+        await writeContractAsync(
+          {
+            functionName: "vote",
+            args: [proposalId, support],
+          },
+          {
+            onBlockConfirmation: (receipt) => {
+              console.log("Vote confirmed!", receipt.transactionHash);
+            },
+            blockConfirmations: 2,
+          }
+        );
+      };
+
+      return (
+        <>
+          <button onClick={() => handleVote(true)}>Vote Yes</button>
+          <button onClick={() => handleVote(false)}>Vote No</button>
+        </>
+      );
+    }
+    ```
+  </Tab>
+</Tabs>
+
+**Parameters:**
+
+<ParamField path="contractName" type="ContractName" required>
+  Name of the deployed contract
+</ParamField>
+
+<ParamField path="chainId" type="number">
+  Target chain ID
+</ParamField>
+
+<ParamField path="disableSimulate" type="boolean" default="false">
+  Skip transaction simulation (faster but less safe)
+</ParamField>
+
+<ParamField path="contractAddress" type="string">
+  Override contract address
+</ParamField>
+
+**Returns:**
+
+- `writeContract()` - Trigger transaction (fire and forget)
+- `writeContractAsync()` - Trigger transaction (returns promise)
+- `isMining` - True while transaction is pending
+- `data` - Transaction hash after submission
+- Standard wagmi write contract returns
+
+**Transaction Options:**
+
+```tsx
+await writeContractAsync(
+  { functionName, args, value },
+  {
+    blockConfirmations: 2,
+    onBlockConfirmation: (receipt) => { /* callback */ },
+  }
+);
+```
+
+### useScaffoldWatchContractEvent
+
+Listen to real-time contract events.
+
+**Location:** `hooks/scaffold-eth/useScaffoldWatchContractEvent.ts`
+
+**Usage:**
+
+```tsx
+import { useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
+import { useState } from "react";
+
+function ProposalCreatedListener() {
+  const [proposals, setProposals] = useState([]);
+
+  useScaffoldWatchContractEvent({
+    contractName: "AgoraDAO",
+    eventName: "ProposalCreated",
+    onLogs: (logs) => {
+      logs.forEach((log) => {
+        setProposals((prev) => [...prev, {
+          id: log.args.proposalId,
+          title: log.args.title,
+          creator: log.args.creator,
+        }]);
+      });
+    },
+  });
+
+  return (
+    <ul>
+      {proposals.map((p) => (
+        <li key={p.id}>{p.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+**Parameters:**
+
+<ParamField path="contractName" type="ContractName" required>
+  Contract to watch
+</ParamField>
+
+<ParamField path="eventName" type="string" required>
+  Event name from contract ABI
+</ParamField>
+
+<ParamField path="onLogs" type="(logs: Log[]) => void" required>
+  Callback when events are emitted
+</ParamField>
+
+<ParamField path="chainId" type="number">
+  Target chain ID
+</ParamField>
+
+### useTransactor
+
+Handles transaction execution with UI feedback.
+
+**Location:** `hooks/scaffold-eth/useTransactor.tsx`
+
+**Usage:**
+
+```tsx
+import { useTransactor } from "~~/hooks/scaffold-eth";
+import { parseEther } from "viem";
+
+function SendETH() {
+  const writeTx = useTransactor();
+  const { data: walletClient } = useWalletClient();
+
+  const handleSend = async () => {
+    const tx = async () => {
+      return await walletClient.sendTransaction({
+        to: recipientAddress,
+        value: parseEther("0.1"),
+      });
+    };
+
+    await writeTx(tx, {
+      blockConfirmations: 1,
+      onBlockConfirmation: (receipt) => {
+        console.log("Transaction confirmed!", receipt);
+      },
+    });
+  };
+
+  return <button onClick={handleSend}>Send 0.1 ETH</button>;
+}
+```
+
+**Features:**
+- Automatic toast notifications
+- "Awaiting user confirmation" state
+- "Waiting for transaction" state
+- Success/error feedback
+- Block explorer links
+- Transaction receipt handling
+
+### useTargetNetwork
+
+Get the currently selected network from scaffold config.
+
+**Location:** `hooks/scaffold-eth/useTargetNetwork.ts`
+
+**Usage:**
+
+```tsx
+import { useTargetNetwork } from "~~/hooks/scaffold-eth";
+
+function NetworkInfo() {
+  const { targetNetwork } = useTargetNetwork();
+
+  return (
+    <div>
+      <p>Network: {targetNetwork.name}</p>
+      <p>Chain ID: {targetNetwork.id}</p>
+      <p>Currency: {targetNetwork.nativeCurrency.symbol}</p>
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+```tsx
+{
+  targetNetwork: {
+    id: number;
+    name: string;
+    nativeCurrency: { name: string; symbol: string; decimals: number };
+    rpcUrls: { default: { http: string[] } };
+    blockExplorers: { default: { url: string } };
+  }
+}
+```
+
+### useWatchBalance
+
+Watch wallet balance with real-time updates.
+
+**Location:** `hooks/scaffold-eth/useWatchBalance.ts`
+
+**Usage:**
+
+```tsx
+import { useWatchBalance } from "~~/hooks/scaffold-eth";
+import { formatEther } from "viem";
+
+function WalletBalance({ address }: { address: Address }) {
+  const { data: balance, isLoading } = useWatchBalance({ address });
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      Balance: {formatEther(balance.value)} {balance.symbol}
+    </div>
+  );
+}
+```
+
+### useDeployedContractInfo
+
+Get deployed contract info (address, ABI) by name.
+
+**Location:** `hooks/scaffold-eth/useDeployedContractInfo.ts`
+
+**Usage:**
+
+```tsx
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
+
+function ContractInfo() {
+  const { data: contract } = useDeployedContractInfo({
+    contractName: "AgoraDAO",
+  });
+
+  return (
+    <div>
+      <p>Address: {contract?.address}</p>
+      <p>Deployed Block: {contract?.deployedOnBlock}</p>
+    </div>
+  );
+}
+```
+
+## Wagmi Hooks
+
+Agora DAO uses standard [wagmi hooks](https://wagmi.sh/react/hooks) throughout:
+
+### useAccount
+
+```tsx
+import { useAccount } from "wagmi";
+
+const { address, isConnected, isConnecting, chain } = useAccount();
+```
+
+### useReadContract
+
+```tsx
+import { useReadContract } from "wagmi";
+
+const { data } = useReadContract({
+  address: contractAddress,
+  abi: contractABI,
+  functionName: "balanceOf",
+  args: [userAddress],
+});
+```
+
+### useWriteContract
+
+```tsx
+import { useWriteContract } from "wagmi";
+
+const { writeContract, isPending } = useWriteContract();
+```
+
+### useBalance
+
+```tsx
+import { useBalance } from "wagmi";
+
+const { data: balance } = useBalance({ address: userAddress });
+```
+
+### useEnsName / useEnsAddress
+
+```tsx
+import { useEnsName, useEnsAddress } from "wagmi";
+
+const { data: ensName } = useEnsName({ address: "0x..." });
+const { data: address } = useEnsAddress({ name: "vitalik.eth" });
+```
+
+## Utility Hooks
+
+Additional hooks for common UI patterns.
+
+### useCopyToClipboard
+
+Copy text to clipboard with feedback.
+
+**Location:** `hooks/scaffold-eth/useCopyToClipboard.ts`
+
+**Usage:**
+
+```tsx
+import { useCopyToClipboard } from "~~/hooks/scaffold-eth";
+
+function CopyAddress({ address }: { address: string }) {
+  const { copyToClipboard, isCopiedToClipboard } = useCopyToClipboard();
+
+  return (
+    <button onClick={() => copyToClipboard(address)}>
+      {isCopiedToClipboard ? "Copied!" : "Copy Address"}
+    </button>
+  );
+}
+```
+
+### useOutsideClick
+
+Detect clicks outside an element.
+
+**Location:** `hooks/scaffold-eth/useOutsideClick.ts`
+
+**Usage:**
+
+```tsx
+import { useOutsideClick } from "~~/hooks/scaffold-eth";
+import { useRef, useState } from "react";
+
+function Dropdown() {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useOutsideClick(dropdownRef, () => setIsOpen(false));
+
+  return (
+    <div ref={dropdownRef}>
+      <button onClick={() => setIsOpen(!isOpen)}>Toggle</button>
+      {isOpen && <div>Dropdown content</div>}
+    </div>
+  );
+}
+```
+
+### useNetworkColor
+
+Get color for current network.
+
+**Location:** `hooks/scaffold-eth/useNetworkColor.ts`
+
+**Usage:**
+
+```tsx
+import { useNetworkColor } from "~~/hooks/scaffold-eth";
+
+function NetworkBadge() {
+  const networkColor = useNetworkColor();
+
+  return (
+    <span style={{ color: networkColor }}>
+      Connected Network
+    </span>
+  );
+}
+```
+
+## State Management Hooks
+
+Zustand stores for global state.
+
+### useDaoStore
+
+DAO selection and address storage.
+
+**Location:** `services/store/dao.store.ts`
+
+**Usage:**
+
+```tsx
+import { useDaoStore } from "~~/services/store/dao.store";
+
+function DaoSelector() {
+  const { daoAddress, setDaoAddress, selectedDao, setSelectedDao } = useDaoStore();
+
+  const handleSelect = (address: string) => {
+    setDaoAddress(address);
+    setSelectedDao({ category: "governance", name: "Main DAO" });
+    localStorage.setItem(LOCAL_STORAGE_KEYS.DAO_ADDRESS, address);
+  };
+
+  return <div>Current DAO: {daoAddress}</div>;
+}
+```
+
+**Store Shape:**
+
+```tsx
+type DaoStore = {
+  selectedDao: {
+    category: string;
+    name: string;
+  };
+  setSelectedDao: (dao: { category: string; name: string }) => void;
+  daoAddress: string;
+  setDaoAddress: (address: string) => void;
+};
+```
+
+## Hook Composition Example
+
+Combining multiple hooks:
+
+```tsx
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { useAccount } from "wagmi";
+import { useDaoStore } from "~~/services/store/dao.store";
+
+function ProposalVoting({ proposalId }: { proposalId: bigint }) {
+  const { address } = useAccount();
+  const { daoAddress } = useDaoStore();
+  
+  // Read proposal details
+  const { data: proposal } = useScaffoldReadContract({
+    contractName: "AgoraDAO",
+    functionName: "proposals",
+    args: [proposalId],
+  });
+
+  // Check if user has voted
+  const { data: hasVoted } = useScaffoldReadContract({
+    contractName: "AgoraDAO",
+    functionName: "hasVoted",
+    args: [proposalId, address],
+  });
+
+  // Write vote transaction
+  const { writeContractAsync, isMining } = useScaffoldWriteContract({
+    contractName: "AgoraDAO",
+  });
+
+  const vote = async (support: boolean) => {
+    await writeContractAsync({
+      functionName: "castVote",
+      args: [proposalId, support],
+    });
+  };
+
+  return (
+    <div>
+      <h2>{proposal?.title}</h2>
+      {!hasVoted ? (
+        <div>
+          <button onClick={() => vote(true)} disabled={isMining}>Yes</button>
+          <button onClick={() => vote(false)} disabled={isMining}>No</button>
+        </div>
+      ) : (
+        <p>You have already voted</p>
+      )}
+    </div>
+  );
+}
+```

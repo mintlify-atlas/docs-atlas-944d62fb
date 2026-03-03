@@ -1,0 +1,264 @@
+---
+title: DAO membership
+description: Understand how users join DAOs and the membership system in Agora
+---
+
+## Overview
+
+Agora DAO implements a simple yet effective membership system where users can join DAOs by calling the `joinDao()` function. When a user joins, they automatically receive the `USER_ROLE` and are tracked in both the DAO's and factory's user counters.
+
+## Joining a DAO
+
+The membership flow is straightforward and requires only a single transaction:
+
+```solidity AgoraDao.sol:35-44
+function joinDao() external {
+    require(!hasRole(USER_ROLE, msg.sender), "User already joined");
+    require(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "The owner can't join");
+
+    IAgoraDaoFactory(fabric).addUserCounter(msg.sender);
+    emit UserJoined(msg.sender, userCounter);
+
+    _joinDaoUser(msg.sender);
+    userCounter++;
+}
+```
+
+<Note>
+The `joinDao()` function is permissionless - anyone can call it to join a DAO. There are no approval requirements or whitelist checks.
+</Note>
+
+## Membership requirements
+
+Before joining, the contract validates:
+
+1. **Not already a member**: User must not already have the `USER_ROLE`
+2. **Not the admin**: The DAO creator/admin cannot join as a regular user
+3. **Valid address**: `msg.sender` must be a valid Ethereum address
+
+<Warning>
+DAO admins cannot join their own DAO as members. They already have admin privileges which supersede user permissions.
+</Warning>
+
+## Role assignment process
+
+When a user successfully joins, the internal `_joinDaoUser()` function handles role assignment:
+
+```solidity Rol.sol:110-123
+function _joinDaoUser(address _user) internal {
+    require(!isMemberOfRole[USER_ROLE][_user], "User is already registered in this role's list");
+    require(!hasRole(USER_ROLE, _user), "User already exists");
+
+    // Assign Role
+    _grantRole(USER_ROLE, _user);
+    isMemberOfRole[USER_ROLE][_user] = true;
+
+    roleUsers[USER_ROLE].push(_user);
+    uint256 newPosition = roleUsers[USER_ROLE].length - 1;
+    memberPosition[USER_ROLE][_user] = newPosition;
+
+    emit RoleRegistered(USER_ROLE, _user, address(0));
+}
+```
+
+This process:
+- Grants the `USER_ROLE` using OpenZeppelin's AccessControl
+- Adds the user to the role tracking mapping
+- Records the user's position in the role array
+- Emits a `RoleRegistered` event
+
+## User tracking
+
+Agora DAO maintains multiple user counters:
+
+### DAO-level counter
+
+```solidity AgoraDao.sol:21
+uint256 public userCounter;
+```
+
+Tracks the number of members in this specific DAO. Incremented each time someone joins.
+
+### Factory-level counter
+
+```solidity AgoraDaoFactory.sol:30
+uint256 public userCounter;
+```
+
+Tracks unique users across the entire Agora ecosystem. The factory's `addUserCounter()` function ensures each address is only counted once:
+
+```solidity AgoraDaoFactory.sol:103-108
+function addUserCounter(address _newUser) public {
+    if (!isUser[_newUser] && _newUser != address(0) && _newUser != address(this)) {
+        isUser[_newUser] = true;
+        userCounter++;
+    }
+}
+```
+
+<Info>
+A user is only counted once in the factory's global counter, even if they join multiple DAOs.
+</Info>
+
+## Member benefits and permissions
+
+Once a user joins and receives the `USER_ROLE`, they gain access to:
+
+<CardGroup cols={2}>
+  <Card title="Voting rights" icon="check-to-slot">
+    Participate in DAO governance and proposals
+  </Card>
+  <Card title="Proposal creation" icon="pen-to-square">
+    Create basic proposals for the DAO
+  </Card>
+  <Card title="Dashboard access" icon="gauge">
+    View DAO dashboard and analytics
+  </Card>
+  <Card title="Discussion participation" icon="comments">
+    Engage in DAO discussions and forums
+  </Card>
+</CardGroup>
+
+<Note>
+The exact permissions depend on your DAO's configuration. The `USER_ROLE` provides baseline access that can be extended with additional roles.
+</Note>
+
+## Role hierarchy
+
+In Agora DAO, members can have multiple roles simultaneously:
+
+```
+DEFAULT_ADMIN_ROLE (highest authority)
+    ├── AUDITOR_ROLE
+    ├── TASK_MANAGER_ROLE
+    ├── PROPOSAL_MANAGER_ROLE
+    └── USER_ROLE (base membership)
+```
+
+- **Admin**: Can assign all roles, manage DAO settings
+- **Auditor**: Can audit transactions and proposals, assign non-admin roles
+- **Task Manager**: Can create and manage tasks
+- **Proposal Manager**: Can manage proposals and voting
+- **User**: Base member with voting and basic proposal rights
+
+## Querying membership
+
+Check if an address is a DAO member:
+
+<CodeGroup>
+```solidity Smart contract
+function isRole(bytes32 _role, address _user) external view returns (bool) {
+    return hasRole(_role, _user);
+}
+```
+
+```typescript Frontend example
+const { data: isMember } = useScaffoldReadContract({
+  contractName: "AgoraDao",
+  functionName: "isRole",
+  args: [USER_ROLE, userAddress],
+  contractAddress: daoAddress,
+});
+```
+</CodeGroup>
+
+Get all members with a specific role:
+
+```solidity Rol.sol:28-30
+function getMemberByRole(bytes32 _role) external view returns (address[] memory) {
+    return roleUsers[_role];
+}
+```
+
+## Events
+
+The membership system emits events for tracking:
+
+### UserJoined event
+
+```solidity AgoraDao.sol:25
+event UserJoined(address indexed user, uint256 userID);
+```
+
+Emitted when a user successfully joins the DAO. Contains:
+- `user`: The address that joined
+- `userID`: Their user counter ID in the DAO
+
+### RoleRegistered event
+
+```solidity Rol.sol:20
+event RoleRegistered(bytes32 indexed role, address indexed user, address indexed executor);
+```
+
+Emitted when the USER_ROLE is granted. Contains:
+- `role`: The role bytes (USER_ROLE)
+- `user`: The address receiving the role
+- `executor`: address(0) for self-join operations
+
+## Frontend integration example
+
+Here's how to implement a "Join DAO" button in your React application:
+
+```typescript
+import { useScaffoldWriteContract, useScaffoldReadContract } from "~/hooks/scaffold-eth";
+import { USER_ROLE } from "~/constants/roles";
+
+function JoinDaoButton({ daoAddress, userAddress }) {
+  // Check if already a member
+  const { data: isMember } = useScaffoldReadContract({
+    contractName: "AgoraDao",
+    functionName: "isRole",
+    args: [USER_ROLE, userAddress],
+    contractAddress: daoAddress,
+  });
+
+  // Write function for joining
+  const { writeContractAsync } = useScaffoldWriteContract({
+    contractName: "AgoraDao",
+    contractAddress: daoAddress,
+  });
+
+  const handleJoin = async () => {
+    try {
+      await writeContractAsync({
+        functionName: "joinDao",
+      });
+    } catch (error) {
+      console.error("Failed to join DAO:", error);
+    }
+  };
+
+  if (isMember) {
+    return <span>Already a member</span>;
+  }
+
+  return <button onClick={handleJoin}>Join DAO</button>;
+}
+```
+
+## Membership management
+
+Unlike role assignment, membership joining is self-service:
+
+- Users call `joinDao()` themselves
+- No admin approval required
+- Instant membership upon transaction confirmation
+- Gas paid by the joining user
+
+<Warning>
+There is currently no built-in mechanism to leave a DAO. Once a user joins and receives the USER_ROLE, only an admin can revoke it using `deleteRole()`.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Role management" icon="user-shield" href="/features/role-management">
+    Learn about assigning additional roles to members
+  </Card>
+  <Card title="Task management" icon="list-check" href="/features/task-management">
+    Discover how members can contribute through tasks
+  </Card>
+  <Card title="Rewards" icon="coins" href="/features/rewards">
+    Understand the reward system for active members
+  </Card>
+</CardGroup>

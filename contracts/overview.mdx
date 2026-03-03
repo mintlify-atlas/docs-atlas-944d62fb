@@ -1,0 +1,242 @@
+---
+title: Smart contracts overview
+description: Introduction to the Agora DAO smart contract system
+---
+
+The Agora DAO smart contract system provides a complete infrastructure for creating and managing decentralized autonomous organizations on Ethereum and EVM-compatible networks.
+
+## Contract architecture
+
+The system is built around a factory pattern with two core contracts:
+
+- **AgoraDaoFactory** - Factory contract for deploying new DAO instances
+- **AgoraDao** - Individual DAO contract with role-based access control
+
+Both contracts leverage modular inheritance to separate concerns:
+
+- **Rol** - Abstract contract handling role-based permissions
+- **Validation** - Input validation logic for DAO creation
+
+## Key contracts
+
+### AgoraDaoFactory
+
+The factory contract (`contracts/AgoraDaoFactory.sol:15`) manages the creation and registry of all DAOs in the system.
+
+**Key features:**
+- Creates new DAO instances via the factory pattern
+- Maintains a global registry of all DAOs
+- Tracks DAO categories (Service, Governance, Social Impact, Energy)
+- Counts unique users across the platform
+- Inherits from OpenZeppelin's `Ownable` for admin controls
+
+<CodeGroup>
+```solidity Factory structure
+contract AgoraDaoFactory is Ownable, Validation {
+    struct Dao {
+        uint256 daoID;
+        address creator;
+        address daoAddress;
+        string name;
+        string description;
+        string category;
+        string imageURI;
+        uint256 creationTimestamp;
+    }
+
+    uint256 public userCounter;
+    uint256 public daoCounter;
+    Dao[] public allDaos;
+}
+```
+
+```solidity Creating a DAO
+function createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string memory _imageURI
+) external {
+    // Validation
+    _createDao(_name, _description, _categoryID, daoCategories);
+
+    // Create new DAO contract
+    AgoraDao createdDaoContract = new AgoraDao(address(this), msg.sender);
+
+    // Store and emit event
+    emit DaoCreated(daoCounter, msg.sender, _name);
+}
+```
+</CodeGroup>
+
+### AgoraDao
+
+Individual DAO contract (`contracts/AgoraDao.sol:17`) that manages members and roles.
+
+**Key features:**
+- Role-based access control via the `Rol` abstract contract
+- User membership management
+- Integration with parent factory contract
+- Built on OpenZeppelin's `AccessControl`
+
+<CodeGroup>
+```solidity DAO structure
+contract AgoraDao is Rol {
+    address public fabric;
+    uint256 public daoID;
+    uint256 public userCounter;
+
+    constructor(address _fabric, address _creator) {
+        fabric = _fabric;
+        _grantRole(DEFAULT_ADMIN_ROLE, _creator);
+        userCounter++;
+    }
+}
+```
+
+```solidity Joining a DAO
+function joinDao() external {
+    require(!hasRole(USER_ROLE, msg.sender), "User already joined");
+    require(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "The owner can't join");
+
+    IAgoraDaoFactory(fabric).addUserCounter(msg.sender);
+    emit UserJoined(msg.sender, userCounter);
+
+    _joinDaoUser(msg.sender);
+    userCounter++;
+}
+```
+</CodeGroup>
+
+### Rol (Role management)
+
+Abstract contract (`contracts/AgoraDao/Rol.sol:6`) providing comprehensive role-based access control.
+
+**Available roles:**
+- `DEFAULT_ADMIN_ROLE` - Full administrative privileges (DAO creator)
+- `AUDITOR_ROLE` - Can assign roles (except admin)
+- `TASK_MANAGER_ROLE` - Manages tasks (future functionality)
+- `PROPOSAL_MANAGER_ROLE` - Manages proposals (future functionality)
+- `USER_ROLE` - Standard DAO member
+
+<CodeGroup>
+```solidity Role definitions
+abstract contract Rol is AccessControl {
+    bytes32 internal constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+    bytes32 internal constant TASK_MANAGER_ROLE = keccak256("TASK_MANAGER_ROLE");
+    bytes32 internal constant PROPOSAL_MANAGER_ROLE = keccak256("PROPOSAL_MANAGER_ROLE");
+    bytes32 internal constant USER_ROLE = keccak256("USER_ROLE");
+}
+```
+
+```solidity Assigning roles
+function registerRole(bytes32 _role, address _user) external {
+    require(_user != address(0), "User address cannot be zero");
+    require(_user != msg.sender, "Caller cannot assign role to self");
+
+    // Permission checks
+    if (_role == AUDITOR_ROLE) {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), 
+                "Only admin can assign AUDITOR_ROLE");
+    } else {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || 
+            hasRole(AUDITOR_ROLE, msg.sender),
+            "Caller must be Admin or Auditor to assign this role"
+        );
+    }
+
+    _grantRole(_role, _user);
+}
+```
+</CodeGroup>
+
+### Validation
+
+Abstract contract (`contracts/AgoraDaoFactory/Validation.sol:4`) that validates DAO creation parameters.
+
+**Validation rules:**
+- Name: 1-50 characters
+- Description: 1-500 characters
+- Category ID must be valid
+
+```solidity Validation logic
+abstract contract Validation {
+    function _createDao(
+        string memory _name,
+        string memory _description,
+        uint256 _categoryID,
+        string[] memory _daoCategories
+    ) internal virtual {
+        require(bytes(_name).length > 0, "Dao name must not be empty");
+        require(bytes(_name).length <= 50, "The name of the DAO is very long");
+        require(bytes(_description).length > 0, "DAO description must not be empty");
+        require(bytes(_description).length <= 500, "The description of the DAO is very long");
+        require(_categoryID < _daoCategories.length, "Invalid category ID.");
+    }
+}
+```
+
+## OpenZeppelin dependencies
+
+The contracts leverage battle-tested OpenZeppelin libraries:
+
+- **AccessControl** - Role-based permission system used in `Rol.sol`
+- **Ownable** - Single owner pattern used in `AgoraDaoFactory.sol`
+
+These dependencies are specified in `package.json`:
+
+```json
+"dependencies": {
+  "@openzeppelin/contracts": "^5.0.2"
+}
+```
+
+## Security features
+
+<AccordionGroup>
+  <Accordion title="Role-based access control">
+    Every privileged operation requires specific role permissions. Admins cannot assign roles to themselves, and only admins can assign auditor roles.
+  </Accordion>
+
+  <Accordion title="Input validation">
+    All user inputs are validated for length and format before storage, preventing excessive gas costs and invalid data.
+  </Accordion>
+
+  <Accordion title="Reentrancy protection">
+    Follows checks-effects-interactions pattern. State changes occur before external calls.
+  </Accordion>
+
+  <Accordion title="Factory pattern">
+    New DAOs are deployed via a trusted factory, ensuring consistent initialization and proper tracking.
+  </Accordion>
+
+  <Accordion title="OpenZeppelin libraries">
+    Built on audited, industry-standard contracts for ownership and access control.
+  </Accordion>
+</AccordionGroup>
+
+## Events
+
+Contracts emit events for important state changes:
+
+**AgoraDaoFactory:**
+- `DaoCreated(uint256 indexed daoID, address indexed creator, string indexed name)`
+
+**AgoraDao:**
+- `UserJoined(address indexed user, uint256 userID)`
+
+**Rol:**
+- `RoleRegistered(bytes32 indexed role, address indexed user, address indexed executor)`
+- `RoleDeleted(bytes32 indexed role, address indexed user, address indexed executor)`
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/contracts/architecture">
+    Deep dive into contract relationships and inheritance
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/contracts/deployment">
+    Learn how to deploy and verify contracts
+  </Card>
+</CardGroup>

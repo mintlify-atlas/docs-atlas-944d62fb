@@ -1,0 +1,186 @@
+---
+title: Joining a DAO
+description: Learn how to find and join DAOs on the Agora DAO platform
+---
+
+This guide explains how to discover and join DAOs on the Agora DAO platform.
+
+## Finding DAOs
+
+You can browse all available DAOs using the `getAllDaos` function from the `AgoraDaoFactory` contract:
+
+```solidity
+function getAllDaos() external view returns (Dao[] memory) {
+    Dao[] memory _allDaos = new Dao[](allDaos.length);
+    for (uint256 i = 0; i < allDaos.length; i++) {
+        _allDaos[i] = allDaos[i];
+    }
+    return _allDaos;
+}
+```
+
+Each DAO contains the following information:
+
+- `daoID` - Unique identifier
+- `creator` - Address of the DAO creator
+- `daoAddress` - Contract address of the DAO
+- `name` - DAO name
+- `description` - DAO description
+- `category` - DAO category (SERVICE, GOVERNANCE, SOCIAL IMPACT, ENERGY)
+- `imageURI` - IPFS CID for the DAO logo
+- `creationTimestamp` - When the DAO was created
+
+## Prerequisites
+
+Before joining a DAO:
+
+- Connect your Ethereum wallet
+- Ensure you're not already a member or the owner
+- Have sufficient ETH for gas fees
+
+<Note>
+DAO owners cannot join their own DAO - they are automatically granted admin privileges at creation.
+</Note>
+
+## Joining a DAO
+
+<Steps>
+  <Step title="Browse available DAOs">
+    Navigate to the DAOs page to see all available DAOs. Each DAO card displays:
+
+    - DAO name and logo
+    - User count
+    - Category badge
+    - Description preview
+    - Join/Enter button
+  </Step>
+
+  <Step title="Review DAO details">
+    Click the details button to view more information about the DAO:
+
+    - Full description
+    - Creation date
+    - Member list
+    - Recent activity
+  </Step>
+
+  <Step title="Click the join button">
+    If you're not already a member, you'll see a "Unirse" (Join) button. Click it to join the DAO.
+
+    ```typescript
+    await writeAgoraDaoAsync({
+      functionName: "joinDao"
+    });
+    ```
+  </Step>
+
+  <Step title="Confirm the transaction">
+    Your wallet will prompt you to confirm the transaction. Review and approve it.
+  </Step>
+
+  <Step title="Wait for confirmation">
+    The transaction will be processed on the blockchain. Once confirmed, you'll be redirected to the DAO dashboard.
+  </Step>
+</Steps>
+
+## What happens when you join
+
+When you successfully join a DAO, several things occur:
+
+### 1. User role assignment
+
+You are automatically granted the `USER_ROLE`, which gives you basic membership privileges:
+
+```solidity
+function joinDao() external {
+    require(!hasRole(USER_ROLE, msg.sender), "User already joined");
+    require(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "The owner can't join");
+    
+    IAgoraDaoFactory(fabric).addUserCounter(msg.sender);
+    emit UserJoined(msg.sender, userCounter);
+    
+    _joinDaoUser(msg.sender);
+    userCounter++;
+}
+```
+
+From AgoraDao.sol:35-44
+
+### 2. User counter increment
+
+Both the DAO's user counter and the platform's global user counter are incremented:
+
+```solidity
+function addUserCounter(address _newUser) public {
+    if (!isUser[_newUser] && _newUser != address(0) && _newUser != address(this)) {
+        isUser[_newUser] = true;
+        userCounter++;
+    }
+}
+```
+
+From AgoraDaoFactory.sol:103-108
+
+### 3. Event emission
+
+A `UserJoined` event is emitted with your address and user ID:
+
+```solidity
+event UserJoined(address indexed user, uint256 userID);
+```
+
+### 4. Role tracking
+
+You're added to the DAO's role tracking system:
+
+```solidity
+_grantRole(USER_ROLE, _user);
+isMemberOfRole[USER_ROLE][_user] = true;
+roleUsers[USER_ROLE].push(_user);
+```
+
+From Rol.sol:110-122
+
+## Member benefits
+
+As a DAO member with `USER_ROLE`, you can:
+
+- **Vote on proposals** - Participate in DAO governance
+- **Create proposals** - Submit new ideas
+- **View dashboard** - Access member-only information
+- **Participate in discussions** - Engage with the community
+
+<Tip>
+To gain additional permissions like task management or proposal management, ask a DAO admin to assign you additional roles.
+</Tip>
+
+## Checking membership status
+
+You can verify your membership status using the `isRole` function:
+
+```solidity
+const { data: isMember } = useScaffoldReadContract({
+  contractName: "AgoraDao",
+  functionName: "isRole",
+  args: [USER_ROLE, userAddress],
+  contractAddress: daoAddress
+});
+```
+
+From DaoCard.tsx:91-96
+
+## Restrictions
+
+<Warning>
+You cannot join a DAO if:
+
+- You're already a member
+- You're the DAO owner (admins are automatically part of the DAO)
+- Your address is `address(0)`
+</Warning>
+
+## Next steps
+
+- Learn about [managing roles](/guides/managing-roles) to understand permission levels
+- Explore [DAO configuration](/guides/configuration) to see how DAOs are set up
+- Check out [creating a DAO](/guides/creating-dao) if you want to start your own

@@ -1,0 +1,265 @@
+---
+title: 'Validation'
+description: 'Input validation contract for DAO creation'
+---
+
+## Overview
+
+The `Validation` abstract contract provides input validation logic for DAO creation in the Agora ecosystem. It ensures that DAO names, descriptions, and categories meet specific requirements before a DAO is deployed, preventing invalid or malicious data from being stored on-chain.
+
+**Contract:** `AgoraDaoFactory/Validation.sol`  
+**Type:** Abstract Contract  
+**Inherited By:** `AgoraDaoFactory`
+
+## Purpose
+
+The Validation contract serves as a security and data quality layer that:
+- Validates string length constraints for names and descriptions
+- Ensures required fields are not empty
+- Validates category IDs against available categories
+- Prevents gas waste from excessively long strings
+
+## Functions
+
+### _createDao
+
+Internal validation function called before creating a new DAO.
+
+```solidity
+function _createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string[] memory _daoCategories
+) internal virtual
+```
+
+<ParamField path="_name" type="string" required>
+  The proposed name for the DAO
+</ParamField>
+
+<ParamField path="_description" type="string" required>
+  The proposed description for the DAO
+</ParamField>
+
+<ParamField path="_categoryID" type="uint256" required>
+  Index of the selected category in the _daoCategories array
+</ParamField>
+
+<ParamField path="_daoCategories" type="string[]" required>
+  Array of available DAO categories (passed from factory state)
+</ParamField>
+
+## Validation Rules
+
+### Name Requirements
+
+```solidity
+require(bytes(_name).length > 0, "Dao name must not be empty");
+require(bytes(_name).length <= 50, "The name of the DAO is very long");
+```
+
+<ResponseField name="Minimum Length" type="validation">
+  **Rule**: Must be at least 1 byte  
+  **Error**: "Dao name must not be empty"  
+  **Reason**: Ensures every DAO has an identifiable name
+</ResponseField>
+
+<ResponseField name="Maximum Length" type="validation">
+  **Rule**: Must not exceed 50 bytes  
+  **Error**: "The name of the DAO is very long"  
+  **Reason**: Prevents excessive gas costs and ensures UI compatibility
+</ResponseField>
+
+### Description Requirements
+
+```solidity
+require(bytes(_description).length > 0, "DAO description must not be empty");
+require(bytes(_description).length <= 500, "The description of the DAO is very long");
+```
+
+<ResponseField name="Minimum Length" type="validation">
+  **Rule**: Must be at least 1 byte  
+  **Error**: "DAO description must not be empty"  
+  **Reason**: Requires DAOs to provide context about their purpose
+</ResponseField>
+
+<ResponseField name="Maximum Length" type="validation">
+  **Rule**: Must not exceed 500 bytes  
+  **Error**: "The description of the DAO is very long"  
+  **Reason**: Balances detailed descriptions with gas efficiency
+</ResponseField>
+
+### Category Validation
+
+```solidity
+require(_categoryID < _daoCategories.length, "Invalid category ID.");
+```
+
+<ResponseField name="Valid Category" type="validation">
+  **Rule**: Category ID must be a valid index in the categories array  
+  **Error**: "Invalid category ID."  
+  **Reason**: Ensures the DAO is assigned to an existing, valid category
+</ResponseField>
+
+## Usage in AgoraDaoFactory
+
+The validation function is called at the beginning of `AgoraDaoFactory.createDao()`:
+
+```solidity
+function createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string memory _imageURI
+) external {
+    // Validation happens first
+    _createDao(_name, _description, _categoryID, daoCategories);
+    
+    // Only proceeds if validation passes
+    AgoraDao createdDaoContract = new AgoraDao(address(this), msg.sender);
+    // ... rest of creation logic
+}
+```
+
+## Error Handling
+
+All validation errors cause the transaction to revert with descriptive error messages:
+
+| Error Message | Cause | Solution |
+|--------------|-------|----------|
+| "Dao name must not be empty" | Empty name string | Provide a name with at least 1 character |
+| "The name of the DAO is very long" | Name exceeds 50 bytes | Shorten the name to 50 bytes or less |
+| "DAO description must not be empty" | Empty description string | Provide a description with at least 1 character |
+| "The description of the DAO is very long" | Description exceeds 500 bytes | Shorten the description to 500 bytes or less |
+| "Invalid category ID." | Category ID out of bounds | Use a valid category index (0 to categories.length - 1) |
+
+## Validation Examples
+
+### Valid DAO Creation
+
+```solidity
+// All validation checks pass
+factory.createDao(
+    "Climate DAO",                              // Valid: 11 bytes
+    "Funding climate change mitigation projects", // Valid: 44 bytes
+    2,                                            // Valid: category exists
+    "ipfs://QmExample..."
+);
+```
+
+### Invalid Examples
+
+```solidity
+// Fails: Name too long (51 characters)
+factory.createDao(
+    "This is an extremely long DAO name that exceeds the limit",
+    "Description",
+    0,
+    "ipfs://..."
+);
+// Reverts with: "The name of the DAO is very long"
+
+// Fails: Empty description
+factory.createDao(
+    "Valid DAO Name",
+    "",  // Empty string
+    1,
+    "ipfs://..."
+);
+// Reverts with: "DAO description must not be empty"
+
+// Fails: Invalid category
+factory.createDao(
+    "Valid DAO Name",
+    "Valid description",
+    99,  // No category at index 99
+    "ipfs://..."
+);
+// Reverts with: "Invalid category ID."
+```
+
+## Gas Considerations
+
+### Why Length Limits Matter
+
+1. **Storage Costs**: Longer strings cost more gas to store on-chain
+2. **Read Costs**: Retrieving long strings from storage is expensive
+3. **Array Operations**: When returning all DAOs, long strings increase gas costs
+4. **UI Performance**: Reasonable limits ensure smooth frontend rendering
+
+### Byte Length vs Character Count
+
+Important: The validation uses `bytes().length`, not character count. This means:
+
+```solidity
+// ASCII characters: 1 byte each
+"Hello" // 5 bytes ✓
+
+// Unicode characters: multiple bytes
+"Hello 世界" // 12 bytes (Hello = 5, space = 1, 世界 = 6)
+
+// Emojis: typically 4 bytes each
+"DAO 🚀" // 8 bytes (DAO = 3, space = 1, 🚀 = 4)
+```
+
+**Best Practice**: Account for multi-byte characters when creating DAO names and descriptions.
+
+## Future Improvements
+
+The contract includes a TODO comment indicating potential future enhancements:
+
+```solidity
+//TODO: me falta verificar que el nombre no este repetido. Pero gastaria mucho gas
+```
+
+**Planned Enhancement**: Duplicate name detection
+- **Challenge**: Checking uniqueness requires iterating through all existing DAO names
+- **Gas Concern**: This operation becomes increasingly expensive as more DAOs are created
+- **Potential Solutions**:
+  - Off-chain name verification before transaction
+  - Name hash mapping for O(1) lookups
+  - Allow duplicates but add DAO ID to distinguish
+
+## Testing Validation
+
+```solidity
+// Test boundary conditions
+
+// Exactly 50 bytes (maximum allowed)
+string memory maxName = "12345678901234567890123456789012345678901234567890";
+factory.createDao(maxName, "Description", 0, "ipfs://...");
+// Should succeed ✓
+
+// 51 bytes (exceeds maximum)
+string memory tooLongName = "123456789012345678901234567890123456789012345678901";
+factory.createDao(tooLongName, "Description", 0, "ipfs://...");
+// Should revert ✗
+
+// Exactly 500 bytes description (maximum allowed)
+string memory maxDesc = "...500 characters...";
+factory.createDao("Name", maxDesc, 0, "ipfs://...");
+// Should succeed ✓
+
+// 501 bytes description (exceeds maximum)
+string memory tooLongDesc = "...501 characters...";
+factory.createDao("Name", tooLongDesc, 0, "ipfs://...");
+// Should revert ✗
+```
+
+## Integration with Factory
+
+The validation contract is designed as an abstract contract inherited by AgoraDaoFactory:
+
+```solidity
+contract AgoraDaoFactory is Ownable, Validation {
+    // Factory inherits _createDao validation function
+    // Called before any DAO creation
+}
+```
+
+This design pattern:
+- Separates validation logic from business logic
+- Makes validation rules easy to test in isolation
+- Allows validation to be extended or overridden in child contracts
+- Keeps the factory contract focused on DAO creation and management

@@ -1,0 +1,450 @@
+---
+title: 'Deployment'
+description: 'Deploy the Agora DAO frontend to production'
+icon: 'rocket'
+---
+
+## Build Process
+
+Before deploying, you need to build the application for production.
+
+### Standard Build
+
+Create an optimized production build:
+
+<CodeGroup>
+  ```bash yarn
+  yarn build
+  ```
+
+  ```bash npm
+  npm run build
+  ```
+
+  ```bash pnpm
+  pnpm build
+  ```
+</CodeGroup>
+
+This runs `next build` which:
+- Compiles TypeScript
+- Optimizes React components
+- Generates static assets
+- Creates production bundles
+
+### Build Verification
+
+After building, test the production build locally:
+
+<CodeGroup>
+  ```bash yarn
+  yarn build && yarn serve
+  ```
+
+  ```bash npm
+  npm run build && npm run serve
+  ```
+
+  ```bash pnpm
+  pnpm build && pnpm serve
+  ```
+</CodeGroup>
+
+The production server will start at `http://localhost:3000`.
+
+### Type Checking
+
+Verify TypeScript types before deployment:
+
+```bash
+yarn check-types
+```
+
+<Warning>
+  Fix all TypeScript errors before deploying to production. Use `NEXT_PUBLIC_IGNORE_BUILD_ERROR=true` only for testing.
+</Warning>
+
+## Deployment Options
+
+Agora DAO frontend can be deployed to various platforms:
+
+<CardGroup cols={2}>
+  <Card title="Vercel" icon="triangle">
+    Recommended for traditional web hosting
+  </Card>
+  
+  <Card title="IPFS" icon="cube">
+    Recommended for decentralized hosting
+  </Card>
+</CardGroup>
+
+## Vercel Deployment
+
+Vercel is the recommended platform for deploying Next.js applications.
+
+### Prerequisites
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    The Vercel CLI is already included in `devDependencies`:
+
+    ```bash
+    yarn vercel:login
+    ```
+  </Step>
+
+  <Step title="Link Your Project">
+    Link your local project to Vercel:
+
+    ```bash
+    vercel link
+    ```
+  </Step>
+</Steps>
+
+### Deployment Commands
+
+The project includes specialized Vercel deployment scripts:
+
+<Tabs>
+  <Tab title="Standard Deployment">
+    Deploy with all checks enabled:
+
+    ```bash
+    yarn vercel
+    ```
+
+    This runs:
+    ```bash
+    vercel \
+      --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false \
+      --build-env ENABLE_EXPERIMENTAL_COREPACK=1 \
+      --build-env VERCEL_TELEMETRY_DISABLED=1
+    ```
+  </Tab>
+
+  <Tab title="Skip Error Checks (YOLO)">
+    Deploy while ignoring build errors (use with caution):
+
+    ```bash
+    yarn vercel:yolo
+    ```
+
+    This runs:
+    ```bash
+    vercel \
+      --build-env YARN_ENABLE_IMMUTABLE_INSTALLS=false \
+      --build-env ENABLE_EXPERIMENTAL_COREPACK=1 \
+      --build-env NEXT_PUBLIC_IGNORE_BUILD_ERROR=true \
+      --build-env VERCEL_TELEMETRY_DISABLED=1
+    ```
+
+    <Warning>
+      The `vercel:yolo` command ignores TypeScript and ESLint errors. Only use this for testing or when you're certain the errors won't affect functionality.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### Environment Variables in Vercel
+
+Configure environment variables in the Vercel dashboard:
+
+1. Go to your project settings
+2. Navigate to "Environment Variables"
+3. Add the following variables:
+
+```bash
+NEXT_PUBLIC_ALCHEMY_API_KEY=your_production_alchemy_key
+NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_walletconnect_project_id
+```
+
+<Note>
+  Environment variables set in Vercel override those in `.env.local`. Use different API keys for production and development.
+</Note>
+
+### Deployment Workflow
+
+<Steps>
+  <Step title="Configure Environment">
+    Set production environment variables in Vercel dashboard
+  </Step>
+
+  <Step title="Update Networks">
+    Configure production networks in `scaffold.config.ts`:
+    
+    ```typescript
+    targetNetworks: [chains.mainnet] // or your target network
+    ```
+  </Step>
+
+  <Step title="Deploy Contracts">
+    Deploy smart contracts to your target network first
+  </Step>
+
+  <Step title="Deploy Frontend">
+    Run the deployment command:
+    
+    ```bash
+    yarn vercel
+    ```
+  </Step>
+
+  <Step title="Verify Deployment">
+    Test the deployed application:
+    - Connect wallet
+    - Verify contract interactions
+    - Check all routes
+  </Step>
+</Steps>
+
+## IPFS Deployment
+
+Deploy to IPFS for fully decentralized hosting.
+
+### IPFS Build Configuration
+
+The project is pre-configured for IPFS deployment using `bgipfs`.
+
+### Deployment Command
+
+Deploy to IPFS with a single command:
+
+```bash
+yarn ipfs
+```
+
+This script:
+1. Sets `NEXT_PUBLIC_IPFS_BUILD=true`
+2. Builds static export with `yarn build`
+3. Initializes bgipfs upload configuration
+4. Uploads the `out/` directory to IPFS
+5. Returns the IPFS CID and public URL
+
+### What Happens During IPFS Build
+
+When `NEXT_PUBLIC_IPFS_BUILD=true`, the Next.js config enables:
+
+```typescript next.config.ts
+if (process.env.NEXT_PUBLIC_IPFS_BUILD === "true") {
+  nextConfig.output = "export";        // Static HTML export
+  nextConfig.trailingSlash = true;     // Add trailing slashes
+  nextConfig.images = {
+    unoptimized: true,                 // Disable image optimization
+  };
+}
+```
+
+### IPFS Deployment Output
+
+Successful deployment shows:
+
+```bash
+✓ Static HTML export completed
+✓ Uploading to IPFS...
+🚀 Upload complete! Your site is now available at:
+https://community.bgipfs.com/ipfs/QmXxx...
+```
+
+### IPFS Limitations
+
+<Warning>
+  IPFS deployment has limitations:
+  - No server-side rendering (SSR)
+  - No API routes
+  - No dynamic image optimization
+  - All routes must be static
+</Warning>
+
+Ensure your application is compatible with static export before deploying to IPFS.
+
+### IPFS Deployment Workflow
+
+<Steps>
+  <Step title="Update Configuration">
+    Ensure `scaffold.config.ts` targets the correct network
+  </Step>
+
+  <Step title="Deploy Contracts">
+    Deploy smart contracts to your target network
+  </Step>
+
+  <Step title="Build and Upload">
+    Run the IPFS deployment:
+    
+    ```bash
+    yarn ipfs
+    ```
+  </Step>
+
+  <Step title="Access Your Site">
+    Visit your site at the provided IPFS URL:
+    
+    ```
+    https://community.bgipfs.com/ipfs/<CID>
+    ```
+  </Step>
+
+  <Step title="Pin to IPFS (Optional)">
+    For persistence, pin your CID using:
+    - [Pinata](https://pinata.cloud)
+    - [web3.storage](https://web3.storage)
+    - [Infura IPFS](https://infura.io/product/ipfs)
+  </Step>
+</Steps>
+
+## Production Checklist
+
+Before deploying to production, ensure:
+
+<AccordionGroup>
+  <Accordion title="Environment Configuration" icon="gear">
+    - [ ] Production API keys configured
+    - [ ] Correct network selected in `scaffold.config.ts`
+    - [ ] Environment variables set in hosting platform
+    - [ ] Contract addresses updated
+  </Accordion>
+
+  <Accordion title="Code Quality" icon="code">
+    - [ ] All TypeScript errors resolved
+    - [ ] ESLint warnings addressed
+    - [ ] Code formatted with Prettier
+    - [ ] Tests passing (if applicable)
+  </Accordion>
+
+  <Accordion title="Smart Contracts" icon="file-contract">
+    - [ ] Contracts deployed to target network
+    - [ ] Contract addresses verified
+    - [ ] ABIs generated in `contracts/`
+    - [ ] Contracts verified on block explorer
+  </Accordion>
+
+  <Accordion title="Testing" icon="flask">
+    - [ ] Production build tested locally
+    - [ ] Wallet connections verified
+    - [ ] Contract interactions tested
+    - [ ] All routes accessible
+    - [ ] Mobile responsiveness checked
+  </Accordion>
+
+  <Accordion title="Security" icon="shield">
+    - [ ] No private keys in code
+    - [ ] No sensitive data in client-side code
+    - [ ] HTTPS enabled (Vercel provides this)
+    - [ ] Content Security Policy configured
+  </Accordion>
+</AccordionGroup>
+
+## Deployment Comparison
+
+| Feature | Vercel | IPFS |
+|---------|--------|------|
+| **Deployment Speed** | Fast (~2 min) | Medium (~5 min) |
+| **Server-Side Rendering** | ✅ Yes | ❌ No |
+| **API Routes** | ✅ Yes | ❌ No |
+| **Image Optimization** | ✅ Yes | ❌ No |
+| **Decentralization** | ❌ No | ✅ Yes |
+| **Censorship Resistance** | ❌ No | ✅ Yes |
+| **Custom Domain** | ✅ Easy | ⚠️ Requires ENS/DNSLink |
+| **Cost** | Free tier available | Pay for pinning services |
+| **Automatic HTTPS** | ✅ Yes | ✅ Yes (via gateway) |
+
+## Continuous Deployment
+
+### Vercel Git Integration
+
+Enable automatic deployments:
+
+1. Connect your GitHub/GitLab repository to Vercel
+2. Configure production branch (usually `main`)
+3. Enable automatic deployments
+4. Set environment variables
+
+Every push to the production branch triggers a deployment.
+
+### GitHub Actions (IPFS)
+
+Automate IPFS deployments with GitHub Actions:
+
+```yaml .github/workflows/deploy-ipfs.yml
+name: Deploy to IPFS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: yarn install
+        working-directory: packages/nextjs
+        
+      - name: Deploy to IPFS
+        run: yarn ipfs
+        working-directory: packages/nextjs
+        env:
+          NEXT_PUBLIC_ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: ${{ secrets.WALLET_CONNECT_PROJECT_ID }}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with TypeScript errors" icon="triangle-exclamation">
+    Run `yarn check-types` locally to see all errors. Fix them before deploying.
+    
+    If you need to deploy urgently (not recommended):
+    ```bash
+    yarn vercel:yolo
+    ```
+  </Accordion>
+
+  <Accordion title="Wallet won't connect after deployment" icon="wallet">
+    Verify:
+    - Correct network configured in `scaffold.config.ts`
+    - Valid `NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID`
+    - Contracts deployed to the target network
+  </Accordion>
+
+  <Accordion title="Contract interactions fail" icon="file-contract">
+    Check:
+    - Contract addresses in `contracts/deployedContracts.ts`
+    - Network ID matches deployed contracts
+    - ABIs are up to date
+  </Accordion>
+
+  <Accordion title="IPFS deployment fails" icon="cube">
+    Common issues:
+    - Build errors (run `NEXT_PUBLIC_IPFS_BUILD=true yarn build` to debug)
+    - API routes or SSR features (not supported on IPFS)
+    - Network connectivity to IPFS upload service
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monitoring" icon="chart-line">
+    Set up monitoring with Vercel Analytics or custom solutions
+  </Card>
+  
+  <Card title="Custom Domain" icon="globe">
+    Configure a custom domain for your deployment
+  </Card>
+  
+  <Card title="Performance" icon="gauge-high">
+    Optimize performance with caching and CDN
+  </Card>
+  
+  <Card title="Security" icon="shield">
+    Implement additional security measures
+  </Card>
+</CardGroup>

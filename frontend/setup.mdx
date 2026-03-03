@@ -1,0 +1,214 @@
+---
+title: 'Frontend Setup'
+description: 'Set up the Agora DAO frontend for local development'
+icon: 'laptop-code'
+---
+
+## Prerequisites
+
+Before setting up the frontend, ensure you have the following installed:
+
+- **Node.js**: v18.19.50 or higher (tested with v24.13.1)
+- **Package Manager**: Yarn 3.2.3 (recommended) or npm/pnpm
+- **Git**: For cloning the repository
+
+## Installation
+
+<Steps>
+  <Step title="Navigate to the frontend directory">
+    From the project root, navigate to the Next.js package:
+    
+    ```bash
+    cd packages/nextjs
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install the required dependencies using your preferred package manager:
+
+    <CodeGroup>
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash npm
+      npm install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+
+    <Note>
+      The project uses **Yarn 3.2.3** as specified in `package.json`. If you use Yarn, it will automatically use the correct version via Corepack.
+    </Note>
+  </Step>
+
+  <Step title="Configure environment variables">
+    Copy the example environment file and configure your variables:
+
+    ```bash
+    cp .env.example .env.local
+    ```
+
+    See [Configuration](/frontend/configuration) for details on required environment variables.
+  </Step>
+
+  <Step title="Start the development server">
+    Run the development server:
+
+    <CodeGroup>
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
+
+    The application will start at `http://localhost:3000`
+  </Step>
+</Steps>
+
+## Available Scripts
+
+The frontend package includes several useful scripts defined in `package.json`:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| **dev** | `next dev` | Start development server |
+| **start** | `next dev` | Alias for dev |
+| **build** | `next build` | Build for production |
+| **serve** | `next start` | Serve production build |
+| **lint** | `next lint` | Run ESLint |
+| **check-types** | `tsc --noEmit --incremental` | TypeScript type checking |
+| **format** | `prettier --write .` | Format code with Prettier |
+
+### Development Workflow
+
+<CodeGroup>
+  ```bash Type checking
+  yarn check-types
+  ```
+
+  ```bash Linting
+  yarn lint
+  ```
+
+  ```bash Format code
+  yarn format
+  ```
+</CodeGroup>
+
+## Project Structure
+
+The frontend follows a standard Next.js 15 App Router structure:
+
+```
+packages/nextjs/
+├── app/                    # Next.js App Router pages
+│   ├── _components/        # Page-specific components
+│   ├── api/               # API routes
+│   ├── blockexplorer/     # Block explorer pages
+│   ├── configuration/     # DAO configuration pages
+│   ├── dao/               # DAO detail page
+│   ├── daos/              # DAOs list page
+│   ├── debug/             # Debug tools
+│   ├── task/              # Task management pages
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Home page
+├── components/            # Reusable UI components
+│   ├── scaffold-eth/      # Scaffold-ETH components
+│   └── ui/                # shadcn/ui components
+├── contracts/             # Contract ABIs and addresses
+├── hooks/                 # React hooks
+│   ├── scaffold-eth/      # Scaffold-ETH hooks
+│   └── custom hooks
+├── services/              # Service layer
+│   └── web3/              # Web3 configuration (Wagmi, RainbowKit)
+├── styles/                # Global styles
+│   └── globals.css        # Tailwind CSS imports
+├── utils/                 # Utility functions
+├── scaffold.config.ts     # Scaffold-ETH configuration
+├── next.config.ts         # Next.js configuration
+└── package.json           # Dependencies and scripts
+```
+
+### Key Directories
+
+<AccordionGroup>
+  <Accordion title="app/" icon="folder">
+    Contains all Next.js 15 App Router pages and layouts. Each directory represents a route in the application.
+  </Accordion>
+
+  <Accordion title="components/" icon="folder">
+    Reusable React components including:
+    - `scaffold-eth/`: Scaffold-ETH 2 framework components
+    - `ui/`: shadcn/ui component library
+  </Accordion>
+
+  <Accordion title="hooks/" icon="folder">
+    Custom React hooks for blockchain interactions, contract reads/writes, and application state.
+  </Accordion>
+
+  <Accordion title="services/web3/" icon="folder">
+    Web3 configuration including Wagmi and RainbowKit setup for wallet connections and blockchain interactions.
+  </Accordion>
+
+  <Accordion title="contracts/" icon="folder">
+    Generated contract ABIs and deployment addresses. Auto-updated when contracts are deployed.
+  </Accordion>
+</AccordionGroup>
+
+## Technology Stack
+
+The frontend is built with modern web technologies:
+
+### Core Framework
+- **Next.js 15.2.3**: React framework with App Router
+- **React 19.0.0**: UI library
+- **TypeScript 5.8.2**: Type safety
+
+### Web3 Integration
+- **Wagmi 2.16.4**: React hooks for Ethereum
+- **Viem 2.34.0**: TypeScript Ethereum library
+- **RainbowKit 2.2.8**: Wallet connection UI
+
+### Styling
+- **Tailwind CSS 4.1.3**: Utility-first CSS framework
+- **daisyUI 5.0.9**: Component library
+- **shadcn/ui**: Accessible component primitives (Radix UI)
+- **next-themes**: Dark mode support
+
+### Additional Libraries
+- **React Hook Form**: Form management
+- **Zod**: Schema validation
+- **Zustand**: State management
+- **Recharts**: Data visualization
+- **Framer Motion**: Animations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/frontend/configuration">
+    Configure environment variables, networks, and styling
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/frontend/deployment">
+    Deploy to Vercel or IPFS
+  </Card>
+  
+  <Card title="Smart Contracts" icon="file-contract" href="/contracts/overview">
+    Learn about the smart contract architecture
+  </Card>
+  
+  <Card title="Components" icon="code" href="/frontend/components">
+    Explore available hooks and components
+  </Card>
+</CardGroup>

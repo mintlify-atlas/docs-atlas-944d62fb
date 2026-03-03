@@ -1,80 +1,322 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart guide
+description: Create and join your first DAO on Agora in under 5 minutes
 ---
 
-## Get started in three steps
+## Get started with Agora DAO
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through creating your first decentralized autonomous organization, connecting your wallet, and becoming a DAO member. By the end, you'll understand the core workflows of the Agora DAO platform.
 
-### Step 1: Set up your local environment
+<Note>
+  Before you begin, make sure you have a Web3 wallet like MetaMask installed and configured with some test ETH on your chosen network.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Connect your wallet
+
+<Steps>
+  <Step title="Launch the application">
+    Navigate to the Agora DAO application in your browser. The application runs on `http://localhost:3000` for local development.
+  </Step>
+  
+  <Step title="Connect wallet">
+    Click the "Connect Wallet" button in the top-right corner. The application uses RainbowKit to support multiple wallet providers including MetaMask, WalletConnect, Coinbase Wallet, and more.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```typescript
+    // The app supports multiple networks configured in scaffold.config.ts
+    targetNetworks: [chains.hardhat]
+    ```
+  </Step>
+  
+  <Step title="Select network">
+    Ensure you're connected to the correct network. For local development, connect to the Hardhat network (Chain ID: 31337). For production, select Ethereum mainnet or your target network.
+  </Step>
+  
+  <Step title="Confirm connection">
+    Once connected, you'll see your wallet address displayed in the header, along with your ETH balance.
+  </Step>
+</Steps>
+
+## Create your first DAO
+
+Creating a DAO on Agora is straightforward and happens entirely on-chain.
+
+<Steps>
+  <Step title="Navigate to DAOs page">
+    Go to the DAOs page from the navigation menu. You'll see a list of all existing DAOs on the platform.
+  </Step>
+  
+  <Step title="Open the creation dialog">
+    Click the "Create DAO" button (or one of its rotating variants like "Launch DAO" or "Decentralize now") to open the DAO creation form.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    <img src="/images/create-dao-button.png" alt="Create DAO button" />
+  </Step>
+  
+  <Step title="Fill in DAO details">
+    Complete the required fields:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    **Name** (required, max 50 characters)
+    
+    Choose a unique name for your DAO that represents your community or mission.
+    
+    ```typescript
+    // Example from CreateDaoDialog.tsx:53-57
+    defaultValues: {
+      name: "",
+      description: "",
+      categories: undefined,
+      logo: undefined,
+    }
+    ```
+    
+    **Description** (required, max 500 characters)
+    
+    Provide a clear description of your DAO's purpose and goals.
+    
+    **Category** (required)
+    
+    Select from predefined categories:
+    - SERVICE - For service-oriented DAOs
+    - GOVERNANCE - For governance-focused organizations
+    - SOCIAL IMPACT - For charitable and impact initiatives
+    - ENERGY - For sustainability and energy projects
+    
+    ```solidity AgoraDaoFactory.sol:43-48
+    constructor(address initialOwner) Ownable(initialOwner) {
+        daoCategories.push("SERVICE");
+        daoCategories.push("GOVERNANCE");
+        daoCategories.push("SOCIAL IMPACT");
+        daoCategories.push("ENERGY");
+    }
+    ```
+    
+    **Logo** (optional, max 1MB)
+    
+    Upload an image to represent your DAO. Recommended size: 100x100 pixels. The image is stored on IPFS for decentralized hosting.
+  </Step>
+  
+  <Step title="Launch your DAO">
+    Click "Launch DAO" to submit the transaction. This will:
+    
+    1. Upload your logo to IPFS (if provided)
+    2. Call the `createDao` function on the `AgoraDaoFactory` contract
+    3. Deploy a new `AgoraDao` contract instance
+    4. Register you as the admin of the new DAO
+    
+    ```typescript CreateDaoDialog.tsx:136-139
+    await writeAgoraDaoFabricAsync({
+      functionName: "createDao",
+      args: [data.name, data.description, BigInt(data.categories), res?.cid || ""],
+    });
+    ```
+  </Step>
+  
+  <Step title="Confirm the transaction">
+    Your wallet will prompt you to confirm the transaction. Review the gas fees and approve the transaction.
+  </Step>
+  
+  <Step title="Wait for confirmation">
+    The transaction will be mined on the blockchain. Once confirmed, your DAO will appear in the list of all DAOs.
+    
+    <Note>
+      On local networks (Hardhat), transactions are instant. On live networks like mainnet or Sepolia, it may take 15-30 seconds.
+    </Note>
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Warning>
+  As the DAO creator, you automatically receive the `DEFAULT_ADMIN_ROLE`, giving you full administrative privileges. Handle this role with care.
+</Warning>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Join an existing DAO
 
-### Step 3: Go live
+To participate in a DAO, you need to join it first.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+<Steps>
+  <Step title="Browse available DAOs">
+    Navigate to the DAOs page and browse the list of available organizations. You can search and filter by category to find DAOs that match your interests.
+  </Step>
+  
+  <Step title="View DAO details">
+    Click on a DAO card to view its details including:
+    - DAO name and description
+    - Category
+    - Creator address
+    - Creation timestamp
+    - Number of members
+    - DAO contract address
+  </Step>
+  
+  <Step title="Click 'Join DAO'">
+    If you're not already a member, click the "Join DAO" button. This triggers the `joinDao` function on the DAO contract.
+    
+    ```solidity AgoraDao.sol:35-44
+    function joinDao() external {
+        require(!hasRole(USER_ROLE, msg.sender), "User already joined");
+        require(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "The owner can't join");
+
+        IAgoraDaoFactory(fabric).addUserCounter(msg.sender);
+        emit UserJoined(msg.sender, userCounter);
+
+        _joinDaoUser(msg.sender);
+        userCounter++;
+    }
+    ```
+  </Step>
+  
+  <Step title="Confirm transaction">
+    Approve the transaction in your wallet. Once confirmed, you'll be granted the `USER_ROLE` and added to the DAO's member list.
+  </Step>
+  
+  <Step title="Start participating">
+    As a member, you can now:
+    - View DAO proposals
+    - Participate in governance
+    - Be assigned tasks
+    - Earn reputation and rewards
+  </Step>
+</Steps>
+
+<Note>
+  The DAO admin cannot join their own DAO as a regular member. This is enforced by the smart contract to maintain clear role separation.
+</Note>
+
+## Understanding DAO roles
+
+Agora DAO uses OpenZeppelin's AccessControl for robust role management:
+
+<CodeGroup>
+```solidity Role definitions
+bytes32 internal constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
+bytes32 internal constant TASK_MANAGER_ROLE = keccak256("TASK_MANAGER_ROLE");
+bytes32 internal constant PROPOSAL_MANAGER_ROLE = keccak256("PROPOSAL_MANAGER_ROLE");
+bytes32 internal constant USER_ROLE = keccak256("USER_ROLE");
+```
+
+```solidity Register a role
+function registerRole(bytes32 _role, address _user) external {
+    require(_user != address(0), "User address cannot be zero");
+    require(_user != msg.sender, "Caller cannot assign role to self");
+
+    // Verify Permissions
+    if (_role == AUDITOR_ROLE) {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can assign AUDITOR_ROLE");
+    } else {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(AUDITOR_ROLE, msg.sender),
+            "Caller must be Admin or Auditor to assign this role"
+        );
+    }
+
+    _grantRole(_role, _user);
+}
+```
+
+```solidity Batch role assignment
+function registerRoleBatch(bytes32 _role, address[] calldata _users) external {
+    // Permission checks...
+    
+    for (uint256 i = 0; i < _users.length; i++) {
+        address currentUser = _users[i];
+        _grantRole(_role, currentUser);
+        emit RoleRegistered(_role, currentUser, msg.sender);
+    }
+}
+```
+</CodeGroup>
+
+### Role hierarchy
+
+- **DEFAULT_ADMIN_ROLE** - Can assign any role, including AUDITOR_ROLE
+- **AUDITOR_ROLE** - Can assign roles except AUDITOR_ROLE and DEFAULT_ADMIN_ROLE
+- **TASK_MANAGER_ROLE** - Manages task creation and assignment (future feature)
+- **PROPOSAL_MANAGER_ROLE** - Handles governance proposals (future feature)
+- **USER_ROLE** - Standard member with basic participation rights
+
+## Explore DAO data
+
+You can interact with DAOs programmatically or through the UI:
+
+<CodeGroup>
+```typescript Read DAO data
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth";
+
+// Get all DAOs
+const { data: allDaos } = useScaffoldReadContract({
+  contractName: "AgoraDaoFactory",
+  functionName: "getAllDaos",
+});
+
+// Get DAO categories
+const { data: categories } = useScaffoldReadContract({
+  contractName: "AgoraDaoFactory",
+  functionName: "getAllDaoCategories",
+});
+
+// Get total DAO count
+const { data: daoCount } = useScaffoldReadContract({
+  contractName: "AgoraDaoFactory",
+  functionName: "getTotalDaoCount",
+});
+```
+
+```typescript Write to contract
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+
+const { writeContractAsync } = useScaffoldWriteContract({
+  contractName: "AgoraDaoFactory",
+});
+
+// Create a DAO
+await writeContractAsync({
+  functionName: "createDao",
+  args: ["My DAO", "A community-driven DAO", BigInt(0), "ipfs://..."],
+});
+```
+
+```solidity Contract functions
+// AgoraDaoFactory.sol read functions
+function getAllDaos() external view returns (Dao[] memory)
+function getAllDaoCategories() external view returns (string[] memory)
+function getTotalDaoCount() external view returns (uint256)
+
+// AgoraDao.sol functions
+function joinDao() external
+function getMemberByRole(bytes32 _role) external view returns (address[] memory)
+function isRole(bytes32 _role, address _user) external view returns (bool)
+```
+</CodeGroup>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you've created and joined a DAO, explore more advanced features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Role management"
+    icon="user-shield"
+    href="/features/role-management"
+  >
+    Learn how to assign and manage roles within your DAO
+  </Card>
+  <Card
+    title="Task management"
+    icon="list-check"
+    href="/features/task-management"
+  >
+    Create and manage tasks with escrow payments
+  </Card>
+  <Card
+    title="Smart contracts"
+    icon="file-contract"
+    href="/contracts/overview"
+  >
+    Dive deep into the contract architecture
+  </Card>
+  <Card
+    title="Frontend components"
+    icon="code"
+    href="/frontend/components"
+  >
+    Explore all available UI components and hooks
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

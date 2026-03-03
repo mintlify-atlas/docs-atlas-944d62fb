@@ -1,0 +1,396 @@
+---
+title: Rewards
+description: Understanding the reward and incentive systems in Agora DAO
+---
+
+## Overview
+
+Agora DAO's reward system incentivizes active participation and quality contributions from DAO members. While the on-chain reward infrastructure is still in development, the platform supports various reward mechanisms including token payments, NFT badges, and reputation building.
+
+<Note>
+The reward system is designed to integrate with the task management and role systems, creating a comprehensive contributor experience.
+</Note>
+
+## Reward types
+
+Agora DAO supports multiple reward mechanisms to incentivize different types of contributions:
+
+<CardGroup cols={2}>
+  <Card title="Token rewards" icon="coins" color="#f59e0b">
+    USDC, ETH, or custom DAO tokens for completed tasks
+  </Card>
+  <Card title="NFT badges" icon="award" color="#8b5cf6">
+    Achievement tokens for milestones and contributions
+  </Card>
+  <Card title="Reputation points" icon="chart-line" color="#3b82f6">
+    On-chain reputation building for future opportunities
+  </Card>
+  <Card title="Role advancement" icon="arrow-up" color="#10b981">
+    Progression to higher roles with more responsibilities
+  </Card>
+</CardGroup>
+
+## Token-based rewards
+
+The primary reward mechanism is token-based compensation for completed work:
+
+### Supported tokens
+
+- **USDC**: Stablecoin payments for predictable compensation
+- **ETH**: Native Ethereum payments for gas-efficient transfers
+- **DAO tokens**: Custom ERC20 tokens for governance and ecosystem participation
+- **Wrapped tokens**: Support for various ERC20 standards
+
+### Payment structure
+
+Rewards are typically structured as:
+
+```typescript
+interface TaskReward {
+  amount: bigint;           // Reward amount in token units
+  tokenAddress: `0x${string}`; // ERC20 token contract address
+  recipient: `0x${string}`;    // Contributor wallet address
+  taskId: string;              // Associated task identifier
+  status: 'pending' | 'released' | 'disputed';
+}
+```
+
+## Reward distribution methods
+
+### Manual distribution (current)
+
+DAO admins currently coordinate reward distribution manually:
+
+1. **Task completion**: Member completes task and submits deliverables
+2. **Review process**: Task manager reviews and approves work
+3. **Payment initiation**: Admin initiates token transfer to contributor
+4. **Confirmation**: Transaction confirms on-chain
+
+<Info>
+Manual distribution provides flexibility but requires trust between the DAO and contributors. Always verify the DAO's payment track record before committing to large tasks.
+</Info>
+
+### Escrow-based distribution (planned)
+
+Future implementation will include automated escrow:
+
+```solidity Planned feature
+contract TaskEscrow {
+    struct EscrowedTask {
+        uint256 taskId;
+        address creator;
+        address worker;
+        uint256 reward;
+        address token;
+        uint256 deadline;
+        bool completed;
+        bool disputed;
+    }
+
+    function createTask(uint256 _taskId, uint256 _reward, address _token, uint256 _deadline) external {
+        // Transfer tokens to escrow
+        IERC20(_token).transferFrom(msg.sender, address(this), _reward);
+        
+        // Store task details
+        tasks[_taskId] = EscrowedTask({
+            taskId: _taskId,
+            creator: msg.sender,
+            worker: address(0),
+            reward: _reward,
+            token: _token,
+            deadline: _deadline,
+            completed: false,
+            disputed: false
+        });
+    }
+
+    function releasePayment(uint256 _taskId) external {
+        EscrowedTask storage task = tasks[_taskId];
+        require(msg.sender == task.creator, "Only creator can release");
+        require(task.completed, "Task not completed");
+        require(!task.disputed, "Task is disputed");
+
+        // Transfer reward to worker
+        IERC20(task.token).transfer(task.worker, task.reward);
+    }
+}
+```
+
+## NFT reward badges
+
+NFT badges represent achievements and milestones within the DAO:
+
+### Badge categories
+
+<Steps>
+  <Step title="Contributor badges">
+    Issued for task completion milestones (5, 10, 25, 50+ tasks)
+  </Step>
+  <Step title="Role badges">
+    Commemorative NFTs for role assignments and promotions
+  </Step>
+  <Step title="Governance badges">
+    Rewarded for active participation in proposals and voting
+  </Step>
+  <Step title="Special recognition">
+    Custom badges for exceptional contributions or achievements
+  </Step>
+</Steps>
+
+### Planned NFT structure
+
+```solidity Planned feature
+contract DaoAchievementNFT is ERC721 {
+    struct Achievement {
+        string name;
+        string description;
+        uint256 timestamp;
+        string metadataURI;
+    }
+
+    mapping(uint256 => Achievement) public achievements;
+
+    function mintAchievement(
+        address _recipient,
+        string memory _name,
+        string memory _description,
+        string memory _metadataURI
+    ) external onlyRole(TASK_MANAGER_ROLE) {
+        uint256 tokenId = _nextTokenId++;
+        _mint(_recipient, tokenId);
+        
+        achievements[tokenId] = Achievement({
+            name: _name,
+            description: _description,
+            timestamp: block.timestamp,
+            metadataURI: _metadataURI
+        });
+    }
+}
+```
+
+## Reputation system
+
+Building on-chain reputation unlocks opportunities:
+
+### Reputation factors
+
+- **Tasks completed**: Number and complexity of finished tasks
+- **Success rate**: Percentage of approved deliverables
+- **Timeliness**: Meeting deadlines consistently
+- **Governance participation**: Voting frequency and proposal quality
+- **Role tenure**: Length of time in specialized roles
+
+### Reputation benefits
+
+<CardGroup cols={2}>
+  <Card title="Higher-value tasks" icon="arrow-trend-up">
+    Access to premium tasks with larger rewards
+  </Card>
+  <Card title="Role eligibility" icon="user-shield">
+    Qualify for manager and leadership positions
+  </Card>
+  <Card title="Voting weight" icon="scale-balanced">
+    Increased influence in governance decisions
+  </Card>
+  <Card title="Priority assignment" icon="star">
+    First access to new opportunities
+  </Card>
+</CardGroup>
+
+## Role-based rewards
+
+Different roles come with different reward opportunities:
+
+### DEFAULT_ADMIN_ROLE
+- DAO treasury allocations
+- Founder token distributions
+- Long-term governance tokens
+
+### TASK_MANAGER_ROLE
+- Management fees from task creation
+- Bonus for successful task completion rates
+- Priority access to new initiatives
+
+### AUDITOR_ROLE
+- Audit fees for review work
+- Security bounties for finding issues
+- Compliance incentives
+
+### USER_ROLE
+- Task completion rewards
+- Participation incentives
+- Community contribution bonuses
+
+<Info>
+See the [role management documentation](/features/role-management) for details on role assignments and permissions.
+</Info>
+
+## Reward calculation examples
+
+Typical reward ranges by task type:
+
+### Development tasks
+- **Smart contract development**: 500-2000 USDC
+- **Frontend features**: 300-800 USDC
+- **Bug fixes**: 100-300 USDC
+- **Integration work**: 400-1000 USDC
+
+### Design tasks
+- **UI/UX design**: 300-700 USDC
+- **Logo/branding**: 200-500 USDC
+- **Marketing materials**: 150-400 USDC
+
+### Content tasks
+- **Technical documentation**: 200-600 USDC
+- **Research reports**: 300-800 USDC
+- **Tutorial creation**: 150-400 USDC
+- **Blog posts**: 100-300 USDC
+
+<Warning>
+Reward amounts vary based on DAO treasury size, task complexity, and market rates. Always negotiate terms before starting work.
+</Warning>
+
+## Payment workflow
+
+The current payment process follows these steps:
+
+<Steps>
+  <Step title="Task completion">
+    Contributor completes work and submits deliverables for review
+  </Step>
+  <Step title="Quality review">
+    Task manager or admin reviews work against acceptance criteria
+  </Step>
+  <Step title="Approval">
+    If approved, task is marked as complete in the system
+  </Step>
+  <Step title="Payment initiation">
+    DAO admin initiates token transfer from treasury
+  </Step>
+  <Step title="Confirmation">
+    Contributor confirms receipt of payment
+  </Step>
+</Steps>
+
+## Treasury management
+
+DAOs manage reward funds through their treasury:
+
+### Treasury operations
+
+- **Funding**: DAO receives funds from members, grants, or revenue
+- **Budgeting**: Admins allocate funds for different categories
+- **Reserves**: Maintain buffer for ongoing obligations
+- **Diversification**: Hold multiple token types for flexibility
+
+### Payment authority
+
+Only addresses with `DEFAULT_ADMIN_ROLE` can authorize payments from the treasury. This ensures:
+- Accountability for fund usage
+- Prevention of unauthorized withdrawals
+- Clear audit trail for all payments
+
+## Integration with tasks
+
+Rewards directly connect to the task system:
+
+```typescript Task with reward
+const task = {
+  id: "1",
+  title: "Smart Contract Audit",
+  description: "Review governance contract for vulnerabilities",
+  reward: "500 USDC",  // Displayed reward
+  status: "open",
+  category: "Development",
+  priority: "high",
+  deadline: "5 days",
+};
+```
+
+See the [task management documentation](/features/task-management) for more on the task system.
+
+## Vesting schedules
+
+For long-term alignment, DAOs may implement token vesting:
+
+### Vesting parameters
+- **Cliff period**: Initial waiting period (e.g., 3 months)
+- **Vesting duration**: Total unlock period (e.g., 12 months)
+- **Release schedule**: Linear, milestone-based, or custom
+
+### Example vesting schedule
+
+```
+Total reward: 10,000 DAO tokens
+Cliff: 3 months
+Vesting: 12 months linear
+
+Month 0-3:  0 tokens unlocked
+Month 4:    833 tokens unlocked
+Month 5:    1,666 tokens unlocked
+...
+Month 12:   10,000 tokens fully unlocked
+```
+
+## Tax and compliance
+
+<Warning>
+**Important legal considerations:**
+
+- Cryptocurrency rewards may be taxable in your jurisdiction
+- Contributors are responsible for reporting income
+- DAOs should provide payment records for tax purposes
+- Consult with tax professionals for compliance guidance
+</Warning>
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Clear terms" icon="file-contract">
+    Document reward amounts and payment terms before work begins
+  </Card>
+  <Card title="Timely payment" icon="clock">
+    Pay contributors promptly after approval to maintain trust
+  </Card>
+  <Card title="Fair valuation" icon="scale-balanced">
+    Research market rates to ensure competitive compensation
+  </Card>
+  <Card title="Transparent tracking" icon="chart-simple">
+    Maintain public records of rewards and distributions
+  </Card>
+</CardGroup>
+
+## Dispute resolution
+
+If reward disputes arise:
+
+1. **Direct communication**: Contributor and task manager discuss the issue
+2. **Admin mediation**: DAO admin reviews evidence and mediates
+3. **Community vote**: In unclear cases, DAO members vote on resolution
+4. **Partial payment**: Consider compromise solutions for partial completion
+
+## Future enhancements
+
+Planned improvements to the reward system:
+
+- **Automated escrow**: Smart contract-based payment holds
+- **Milestone payments**: Split rewards across deliverable phases
+- **Performance bonuses**: Extra rewards for exceptional work
+- **Referral rewards**: Incentives for bringing in contributors
+- **Streaming payments**: Real-time payment flow for ongoing work
+- **Multi-sig releases**: Require multiple approvals for large payments
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Task management" icon="list-check" href="/features/task-management">
+    Learn how tasks connect to the reward system
+  </Card>
+  <Card title="Role management" icon="user-shield" href="/features/role-management">
+    Understand role-based reward opportunities
+  </Card>
+  <Card title="DAO creation" icon="building" href="/features/dao-creation">
+    Set up your DAO to start rewarding contributors
+  </Card>
+</CardGroup>

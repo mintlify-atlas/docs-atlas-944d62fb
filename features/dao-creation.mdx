@@ -1,0 +1,244 @@
+---
+title: DAO creation
+description: Learn how to create and deploy a new DAO on Agora using the factory pattern
+---
+
+## Overview
+
+Agora DAO uses a factory pattern to create and manage DAOs on Ethereum. The `AgoraDaoFactory` contract deploys individual `AgoraDao` instances, each with its own governance structure and role-based access control system.
+
+## Factory pattern architecture
+
+The factory pattern provides several benefits:
+
+- **Standardized deployment**: All DAOs follow the same deployment process and structure
+- **Centralized tracking**: The factory maintains a registry of all created DAOs
+- **User management**: Global user counter across all DAOs in the ecosystem
+- **Category system**: Built-in categorization for different DAO types
+
+<Note>
+The factory contract is deployed once and used by all users to create their DAOs. Each new DAO gets its own independent contract address.
+</Note>
+
+## The createDao function
+
+The core function for creating a DAO is `createDao()` in the AgoraDaoFactory contract:
+
+```solidity AgoraDaoFactory.sol:53-88
+function createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string memory _imageURI
+) external {
+    // Validation
+    _createDao(_name, _description, _categoryID, daoCategories);
+
+    // Create dao
+    AgoraDao createdDaoContract = new AgoraDao(address(this), msg.sender);
+
+    Dao memory newDao = Dao(
+        daoCounter,
+        msg.sender,
+        address(createdDaoContract),
+        _name,
+        _description,
+        daoCategories[_categoryID],
+        _imageURI,
+        block.timestamp
+    );
+
+    // Store dao
+    daosByUser[msg.sender].push(newDao);
+    allDaos.push(newDao);
+    isDao[address(createdDaoContract)] = true;
+    daoCounter++;
+
+    // Add user counter
+    addUserCounter(msg.sender);
+
+    // Emit event
+    emit DaoCreated(daoCounter, msg.sender, _name);
+}
+```
+
+### Parameters
+
+<ParamField path="_name" type="string" required>
+  The name of your DAO (1-50 characters)
+</ParamField>
+
+<ParamField path="_description" type="string" required>
+  A description of your DAO's purpose (1-500 characters)
+</ParamField>
+
+<ParamField path="_categoryID" type="uint256" required>
+  The category index for your DAO (must be valid)
+</ParamField>
+
+<ParamField path="_imageURI" type="string">
+  IPFS CID or URI for the DAO's logo image
+</ParamField>
+
+## DAO categories
+
+Agora DAO includes a predefined set of categories to classify DAOs. The default categories are:
+
+<CodeGroup>
+```solidity Default categories
+constructor(address initialOwner) Ownable(initialOwner) {
+    daoCategories.push("SERVICE");
+    daoCategories.push("GOVERNANCE");
+    daoCategories.push("SOCIAL IMPACT");
+    daoCategories.push("ENERGY");
+}
+```
+</CodeGroup>
+
+You can retrieve all available categories:
+
+```solidity
+function getAllDaoCategories() external view returns (string[] memory)
+```
+
+<Note>
+Only the contract owner can add new categories using `addDaoCategory()`. Category IDs start at 0.
+</Note>
+
+## Input validation
+
+The factory validates all inputs before deploying:
+
+```solidity Validation.sol:5-19
+function _createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string[] memory _daoCategories
+) internal virtual {
+    require(bytes(_name).length > 0, "Dao name must not be empty");
+    require(bytes(_name).length <= 50, "The name of the DAO is very long");
+    require(bytes(_description).length > 0, "DAO description must not be empty");
+    require(bytes(_description).length <= 500, "The description of the DAO is very long");
+    
+    require(_categoryID < _daoCategories.length, "Invalid category ID.");
+}
+```
+
+<Warning>
+Names are not checked for uniqueness on-chain due to gas costs. It's possible to create multiple DAOs with the same name.
+</Warning>
+
+## Frontend integration
+
+The frontend uses a React form with validation to create DAOs:
+
+<CodeGroup>
+```typescript CreateDaoDialog.tsx
+const { writeContractAsync: writeAgoraDaoFabricAsync } = useScaffoldWriteContract({
+  contractName: "AgoraDaoFactory",
+});
+
+const onSubmit = async (data: z.infer<typeof DaoFormSchema>) => {
+  // Upload logo to IPFS if provided
+  let res: { response: string; cid: string } | undefined;
+  if (data.logo) {
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("logo", data.logo);
+
+    const req = await fetch("/api/upload-image", {
+      method: "POST",
+      body: formData,
+    });
+
+    res = await req.json();
+  }
+
+  // Create DAO on-chain
+  await writeAgoraDaoFabricAsync({
+    functionName: "createDao",
+    args: [data.name, data.description, BigInt(data.categories), res?.cid || ""],
+  });
+};
+```
+
+```typescript Load categories
+const { data: daoCategories, isLoading: daoCategoriesLoading } = useScaffoldReadContract({
+  contractName: "AgoraDaoFactory",
+  functionName: "getAllDaoCategories",
+});
+```
+</CodeGroup>
+
+## DAO data structure
+
+Each DAO is stored with the following information:
+
+```solidity AgoraDaoFactory.sol:17-27
+struct Dao {
+    uint256 daoID;
+    address creator;
+    address daoAddress;
+    string name;
+    string description;
+    string category;
+    string imageURI;
+    uint256 creationTimestamp;
+}
+```
+
+## Querying DAOs
+
+The factory provides several view functions to query DAO data:
+
+<CardGroup cols={2}>
+  <Card title="getAllDaos" icon="list">
+    Returns an array of all DAOs created through the factory
+  </Card>
+  <Card title="daosByUser" icon="user">
+    Mapping to retrieve all DAOs created by a specific address
+  </Card>
+  <Card title="getTotalDaoCount" icon="hashtag">
+    Returns the total number of DAOs created
+  </Card>
+  <Card title="isDao" icon="check">
+    Checks if an address is a valid DAO created by the factory
+  </Card>
+</CardGroup>
+
+## Initial configuration
+
+When a DAO is created:
+
+1. **Factory deployment**: A new `AgoraDao` contract is deployed
+2. **Admin role**: The creator receives `DEFAULT_ADMIN_ROLE` automatically
+3. **User counter**: Creator is added to both factory and DAO user counters
+4. **Registry**: DAO is added to global registry and creator's DAO list
+5. **Event emission**: `DaoCreated` event is emitted with DAO details
+
+```solidity AgoraDao.sol:27-32
+constructor(address _fabric, address _creator) {
+    fabric = _fabric;
+    _grantRole(DEFAULT_ADMIN_ROLE, _creator);
+    
+    userCounter++;
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="DAO membership" icon="users" href="/features/dao-membership">
+    Learn how users can join your DAO
+  </Card>
+  <Card title="Role management" icon="user-shield" href="/features/role-management">
+    Configure roles and permissions
+  </Card>
+  <Card title="Task management" icon="list-check" href="/features/task-management">
+    Set up tasks for your DAO members
+  </Card>
+  <Card title="Rewards" icon="coins" href="/features/rewards">
+    Implement reward systems
+  </Card>
+</CardGroup>

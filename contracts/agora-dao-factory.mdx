@@ -1,0 +1,305 @@
+---
+title: 'AgoraDaoFactory'
+description: 'Factory contract for creating and managing Agora DAOs'
+---
+
+## Overview
+
+The `AgoraDaoFactory` contract is the main factory responsible for creating new DAO instances in the Agora ecosystem. It manages DAO creation, categorization, and tracking of all DAOs and users across the platform. The contract inherits from OpenZeppelin's `Ownable` and the custom `Validation` contract.
+
+**Contract:** `AgoraDaoFactory.sol`  
+**Inherits:** `Ownable`, `Validation`  
+**Author:** NightmareFox12
+
+## State Variables
+
+### Core Counters
+
+```solidity
+uint256 public userCounter;
+uint256 public daoCounter;
+```
+
+- `userCounter`: Tracks the total number of unique users across all DAOs
+- `daoCounter`: Tracks the total number of DAOs created
+
+### Storage
+
+```solidity
+string[] internal daoCategories;
+Dao[] public allDaos;
+```
+
+- `daoCategories`: Array storing available DAO category names
+- `allDaos`: Array containing all created DAOs
+
+### Mappings
+
+```solidity
+mapping(address => Dao[]) public daosByUser;
+mapping(address => bool) internal isUser;
+mapping(address => bool) internal isDao;
+```
+
+- `daosByUser`: Maps creator addresses to their created DAOs
+- `isUser`: Tracks whether an address has been counted as a user
+- `isDao`: Verifies if an address is a canonical DAO contract
+
+## Structs
+
+### Dao
+
+Represents a DAO instance with its metadata.
+
+```solidity
+struct Dao {
+    uint256 daoID;
+    address creator;
+    address daoAddress;
+    string name;
+    string description;
+    string category;
+    string imageURI;
+    uint256 creationTimestamp;
+}
+```
+
+<ResponseField name="daoID" type="uint256">
+  Unique identifier for the DAO
+</ResponseField>
+
+<ResponseField name="creator" type="address">
+  Address of the DAO creator
+</ResponseField>
+
+<ResponseField name="daoAddress" type="address">
+  Deployed contract address of the DAO
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the DAO
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description of the DAO's purpose
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Category classification (e.g., "SERVICE", "GOVERNANCE")
+</ResponseField>
+
+<ResponseField name="imageURI" type="string">
+  URI pointing to the DAO's image/logo
+</ResponseField>
+
+<ResponseField name="creationTimestamp" type="uint256">
+  Block timestamp when the DAO was created
+</ResponseField>
+
+## Functions
+
+### createDao
+
+Creates a new DAO instance with the specified parameters.
+
+```solidity
+function createDao(
+    string memory _name,
+    string memory _description,
+    uint256 _categoryID,
+    string memory _imageURI
+) external
+```
+
+<ParamField path="_name" type="string" required>
+  Name of the DAO (1-50 characters)
+</ParamField>
+
+<ParamField path="_description" type="string" required>
+  Description of the DAO (1-500 characters)
+</ParamField>
+
+<ParamField path="_categoryID" type="uint256" required>
+  Index of the category in the daoCategories array
+</ParamField>
+
+<ParamField path="_imageURI" type="string" required>
+  URI for the DAO's image/logo
+</ParamField>
+
+**Process:**
+1. Validates input parameters through `_createDao` validation
+2. Deploys a new `AgoraDao` contract instance
+3. Creates a `Dao` struct with metadata
+4. Stores the DAO in `daosByUser` and `allDaos`
+5. Marks the address as a canonical DAO
+6. Increments `daoCounter`
+7. Updates user counter for the creator
+8. Emits `DaoCreated` event
+
+**Example:**
+
+```solidity
+factory.createDao(
+    "Climate Action DAO",
+    "A DAO focused on funding climate change initiatives",
+    2, // SOCIAL IMPACT category
+    "ipfs://QmExample..."
+);
+```
+
+### addDaoCategory
+
+Adds a new category to the available DAO categories. Only callable by the contract owner.
+
+```solidity
+function addDaoCategory(string memory newCategory) external onlyOwner
+```
+
+<ParamField path="newCategory" type="string" required>
+  Name of the new category to add
+</ParamField>
+
+**Requirements:**
+- Category name must not be empty
+- Category must not already exist (prevents duplicates)
+- Only callable by contract owner
+
+**Example:**
+
+```solidity
+factory.addDaoCategory("EDUCATION");
+```
+
+### addUserCounter
+
+Increments the user counter if the address is a new user.
+
+```solidity
+function addUserCounter(address _newUser) public
+```
+
+<ParamField path="_newUser" type="address" required>
+  Address to check and potentially add to user count
+</ParamField>
+
+**Logic:**
+- Only increments if address is not already counted
+- Excludes zero address and contract address
+- Can be called by child DAO contracts
+
+### withdraw
+
+Withdraws all Ether from the contract to the owner. Only callable by the contract owner.
+
+```solidity
+function withdraw() external onlyOwner
+```
+
+**Requirements:**
+- Only callable by contract owner
+- Transfers entire contract balance to owner
+
+### getAllDaoCategories
+
+Returns all available DAO categories.
+
+```solidity
+function getAllDaoCategories() external view returns (string[] memory)
+```
+
+<ResponseField name="categories" type="string[]">
+  Array of all available DAO category names
+</ResponseField>
+
+**Default categories:**
+- SERVICE
+- GOVERNANCE
+- SOCIAL IMPACT
+- ENERGY
+
+### getAllDaos
+
+Returns all created DAOs.
+
+```solidity
+function getAllDaos() external view returns (Dao[] memory)
+```
+
+<ResponseField name="daos" type="Dao[]">
+  Array of all DAO structs created through the factory
+</ResponseField>
+
+### getTotalDaoCount
+
+Returns the total number of DAOs created.
+
+```solidity
+function getTotalDaoCount() external view returns (uint256)
+```
+
+<ResponseField name="count" type="uint256">
+  Total number of DAOs in the allDaos array
+</ResponseField>
+
+## Events
+
+### DaoCreated
+
+Emitted when a new DAO is successfully created.
+
+```solidity
+event DaoCreated(uint256 indexed daoID, address indexed creator, string indexed name);
+```
+
+<ResponseField name="daoID" type="uint256" indexed>
+  The ID assigned to the newly created DAO
+</ResponseField>
+
+<ResponseField name="creator" type="address" indexed>
+  Address of the DAO creator
+</ResponseField>
+
+<ResponseField name="name" type="string" indexed>
+  Name of the created DAO
+</ResponseField>
+
+## Constructor
+
+```solidity
+constructor(address initialOwner) Ownable(initialOwner)
+```
+
+Initializes the factory with default categories:
+- SERVICE
+- GOVERNANCE
+- SOCIAL IMPACT
+- ENERGY
+
+<ParamField path="initialOwner" type="address" required>
+  Address that will own the factory contract
+</ParamField>
+
+## Usage Example
+
+```solidity
+// Deploy factory
+AgoraDaoFactory factory = new AgoraDaoFactory(msg.sender);
+
+// Create a new DAO
+factory.createDao(
+    "Developer DAO",
+    "A DAO for coordinating open-source development",
+    0, // SERVICE category
+    "ipfs://QmDevDao..."
+);
+
+// Get all DAOs
+AgoraDaoFactory.Dao[] memory allDaos = factory.getAllDaos();
+
+// Get categories
+string[] memory categories = factory.getAllDaoCategories();
+
+// Get total count
+uint256 totalDaos = factory.getTotalDaoCount();
+```
