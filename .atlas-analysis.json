@@ -1,0 +1,106 @@
+{
+  "projectType": "saas",
+  "projectName": "Agora DAO",
+  "projectDescription": "A decentralized autonomous organization platform for community-driven governance, task management, and token-based incentives on Ethereum.",
+  "theme": "palm",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#7C3AED",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/dao-creation",
+              "features/dao-membership",
+              "features/role-management",
+              "features/task-management",
+              "features/rewards"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-dao",
+              "guides/joining-dao",
+              "guides/managing-roles",
+              "guides/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Smart Contracts",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "contracts/overview",
+              "contracts/architecture",
+              "contracts/deployment"
+            ]
+          },
+          {
+            "group": "Contracts",
+            "pages": [
+              "contracts/agora-dao-factory",
+              "contracts/agora-dao",
+              "contracts/role-system",
+              "contracts/validation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Frontend",
+        "groups": [
+          {
+            "group": "Components",
+            "pages": [
+              "frontend/components",
+              "frontend/hooks",
+              "frontend/utilities"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "frontend/setup",
+              "frontend/configuration",
+              "frontend/deployment"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Decentralized escrow for task payments",
+    "Role-based access control (RBAC)",
+    "DAO creation and management via factory pattern",
+    "Member join and participation system",
+    "Token and NFT rewards for contributors",
+    "Category-based DAO organization"
+  ],
+  "publicApiSurface": [
+    "AgoraDaoFactory.createDao()",
+    "AgoraDaoFactory.getAllDaos()",
+    "AgoraDaoFactory.addDaoCategory()",
+    "AgoraDao.joinDao()",
+    "Rol.registerRole()",
+    "Rol.registerRoleBatch()",
+    "Rol.deleteRole()",
+    "Rol.getMemberByRole()"
+  ]
+}
